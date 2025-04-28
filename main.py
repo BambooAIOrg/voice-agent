@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from dotenv import load_dotenv
-
+load_dotenv(dotenv_path=".env.local")
 from livekit import api
 from livekit.agents import (
     Agent,
@@ -22,8 +22,8 @@ from livekit.agents.job import get_job_context
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
 from livekit.plugins import openai, silero
-from livekit.plugins.minimax import TTS as MinimaxTTS
-from livekit.plugins.aliyun import AliSTT
+from plugins.aliyun.stt import AliSTT
+from plugins.minimax.tts import TTS as MinimaxTTS
 
 # uncomment to enable Krisp BVC noise cancellation, currently supported on Linux and MacOS
 # from livekit.plugins import noise_cancellation
@@ -35,7 +35,7 @@ from livekit.plugins.aliyun import AliSTT
 
 logger = logging.getLogger("multi-agent")
 
-load_dotenv(dotenv_path=".env.local")
+
 
 common_instructions = (
     "You are an editor at a leading publishing house, with a strong track record "

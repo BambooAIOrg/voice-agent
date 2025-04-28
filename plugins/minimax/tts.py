@@ -397,26 +397,40 @@ class SynthesizeStream(tts.SynthesizeStream):
         self._completion_event = asyncio.Event()
         self._error_msg: Optional[str] = None
 
+    def _ensure_session(self) -> aiohttp.ClientSession:
+        if not self._session:
+            self._session = utils.http_context.http_session()
+        return self._session
+
     async def _run(self) -> None:
         try:
             # Connect to WebSocket
             url = self._opts.get_ws_url(f"/ws/v1/t2a_v2")
             headers = {API_KEY_HEADER: self._opts.api_key}
             
-            self._ws = await aiohttp.ClientSession().ws_connect(
+            # Ensure aiohttp session exists (using self._session from __init__)
+            session = self._ensure_session()
+
+            logger.debug(f"Attempting WebSocket connection to: {url}")
+            self._ws = await session.ws_connect(
                 url,
                 headers=headers,
                 heartbeat=30.0
             )
-            
+            logger.debug("WebSocket connect call completed.")
+
             # Wait for connected_success
+            logger.debug("Waiting for 'connected_success' event...")
             async for msg in self._ws:
+                logger.debug(f"Received WebSocket message during connect phase - Type: {msg.type}")
                 if msg.type == aiohttp.WSMsgType.TEXT:
+                    logger.debug(f"WebSocket TEXT data during connect: {msg.data}")
                     data = json.loads(msg.data)
                     if data.get("event") == "connected_success":
                         logger.info("WebSocket connection established")
                         break
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    logger.error(f"WebSocket closed unexpectedly during connect. Type: {msg.type}, Data: {msg.data}")
                     raise APIConnectionError("WebSocket connection failed")
             
             # Send task_start
@@ -437,79 +451,142 @@ class SynthesizeStream(tts.SynthesizeStream):
                     "channel": self._opts.channels
                 }
             }
-            
+            logger.debug(f"Sending task_start message: {start_msg}")
             await self._ws.send_json(start_msg)
             
             # Process task_started response
+            logger.debug("Waiting for 'task_started' event...")
             async for msg in self._ws:
+                logger.debug(f"Received WebSocket message during task start phase - Type: {msg.type}")
                 if msg.type == aiohttp.WSMsgType.TEXT:
+                    logger.debug(f"WebSocket TEXT data during task start: {msg.data}")
                     data = json.loads(msg.data)
                     if data.get("event") == "task_started":
                         logger.info("TTS task started")
                         break
                     elif data.get("event") == "error":
+                        logger.error(f"Received error during task start: {data.get('message', 'Unknown error')}")
                         raise APIStatusError(
                             f"Failed to start TTS task: {data.get('message', 'Unknown error')}",
                             status_code=400,
                         )
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    logger.error(f"WebSocket closed unexpectedly during task start. Type: {msg.type}, Data: {msg.data}")
                     raise APIConnectionError("WebSocket connection closed unexpectedly")
             
             # Process input queue
+            logger.debug("Starting main loop to process input queue and receive audio.")
             while not self._stopping:
                 try:
                     # Wait for input with timeout
                     text = await asyncio.wait_for(self._input_queue.get(), timeout=0.1)
+                    logger.debug(f"Got text from input queue: '{text}'")
                     
                     if text:
                         # Send continue request
-                        await self._ws.send_json({
+                        send_payload = {
                             "event": "task_continue",
                             "text": text
-                        })
+                        }
+                        logger.debug(f"Sending task_continue with payload: {send_payload}")
+                        await self._ws.send_json(send_payload)
+                        logger.debug(f"Successfully sent task_continue for text: '{text}'")
                         
                         # Collect audio chunks
+                        logger.debug("Waiting for audio chunks...")
                         while True:
-                            msg = await self._ws.receive()
-                            if msg.type == aiohttp.WSMsgType.TEXT:
-                                data = json.loads(msg.data)
-                                if "data" in data and "audio" in data["data"]:
-                                    # Decode hex audio data
-                                    audio_hex = data["data"]["audio"]
-                                    audio_data = bytes.fromhex(audio_hex)
-                                    
-                                    # Add to buffer
-                                    self._audio_bytes.extend(audio_data)
-                                    self._audio_event.set()
-                                
-                                if data.get("is_final"):
-                                    break
-                            elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
-                                raise APIConnectionError("WebSocket connection closed unexpectedly")
-                    
+                            logger.debug("Waiting for next message from WebSocket...")
+                            try:
+                                msg = await self._ws.receive()
+                                logger.debug(f"Received WebSocket message - Type: {msg.type}, Raw Data: {msg.data}")
+
+                                if msg.type == aiohttp.WSMsgType.TEXT:
+                                    logger.debug(f"WebSocket TEXT data: {msg.data}")
+                                    data = json.loads(msg.data)
+                                    if data.get("event") == "error":
+                                        logger.error(f"Minimax returned error during streaming: {data.get('message', 'Unknown error')}")
+                                        self._error_msg = data.get('message', 'Unknown error')
+
+                                    if "data" in data and "audio" in data["data"]:
+                                        # Decode hex audio data
+                                        audio_hex = data["data"]["audio"]
+                                        logger.debug(f"Received audio hex chunk (first 50 chars): {audio_hex[:50]}...")
+                                        try:
+                                            audio_data = bytes.fromhex(audio_hex)
+                                            logger.debug(f"Decoded {len(audio_data)} bytes of audio data.")
+                                            # Add to buffer
+                                            self._audio_bytes.extend(audio_data)
+                                            self._audio_event.set()
+                                        except ValueError as hex_e:
+                                            logger.exception("Failed to decode hex audio data")
+
+                                    if data.get("is_final"):
+                                        logger.debug("Received 'is_final' flag from Minimax.")
+                                        break
+                                elif msg.type == aiohttp.WSMsgType.BINARY:
+                                    logger.warning(f"Received unexpected BINARY WebSocket message: {len(msg.data)} bytes")
+                                elif msg.type == aiohttp.WSMsgType.CLOSED:
+                                    logger.warning(f"WebSocket connection closed by peer during audio reception. Message data: {msg.data}")
+                                    raise APIConnectionError("WebSocket connection closed unexpectedly during audio reception")
+                                elif msg.type == aiohttp.WSMsgType.ERROR:
+                                    logger.error(f"WebSocket error during audio reception: {self._ws.exception()}")
+                                    raise APIConnectionError("WebSocket error during audio reception")
+                                else:
+                                    logger.warning(f"Received unhandled WebSocket message type: {msg.type}")
+                            except Exception as receive_exc:
+                                logger.exception("Error during WebSocket message reception/processing:")
+                                self._error_msg = str(receive_exc)
+                                break
+
                     # Mark the task as done
                     self._input_queue.task_done()
                 except asyncio.TimeoutError:
-                    # Timeout just means no input is available yet
                     continue
                 except asyncio.CancelledError:
-                    # Send task_finish if possible
+                    logger.info("TTS stream task cancelled.")
                     if self._ws and not self._ws.closed:
-                        await self._ws.send_json({"event": "task_finish"})
-                    return
-        except Exception as e:
-            logger.error(f"Error in TTS synthesize stream: {e}")
-            self._error_msg = str(e)
+                        try:
+                            logger.debug("Sending task_finish due to cancellation.")
+                            await self._ws.send_json({"event": "task_finish"})
+                        except Exception as finish_e:
+                             logger.exception("Exception sending task_finish on cancellation:")
+                    raise
+                except Exception as loop_e:
+                    logger.exception("Unhandled exception in TTS stream main loop:")
+                    self._error_msg = str(loop_e)
+                    break
+        except asyncio.CancelledError:
+             logger.info("TTS stream setup or start cancelled.")
+             if self._ws and not self._ws.closed:
+                 await self._ws.close()
+             raise
+        except Exception as setup_e:
+            logger.exception(f"Error setting up or starting TTS synthesize stream:")
+            self._error_msg = str(setup_e)
         finally:
-            # Close WebSocket connection
             if self._ws and not self._ws.closed:
                 try:
-                    await self._ws.send_json({"event": "task_finish"})
+                    exception_occurred = self._error_msg is not None
+                    is_cancelled = False
+                    try:
+                        current_task = asyncio.current_task()
+                        if current_task and current_task.cancelled():
+                            is_cancelled = True
+                    except AttributeError:
+                        pass
+                    except RuntimeError:
+                        pass
+
+                    if not is_cancelled and not exception_occurred:
+                       logger.debug("Sending task_finish in finally block.")
+                       await self._ws.send_json({"event": "task_finish"})
+
                     await self._ws.close()
-                except:
-                    pass
+                    logger.debug("WebSocket connection closed in finally block.")
+                except Exception as close_e:
+                     logger.exception("Exception while closing WebSocket in finally:")
             
-            # Mark completion
+            logger.debug("Setting completion event.")
             self._completion_event.set()
 
     async def read(self, n: int = -1) -> bytes:
