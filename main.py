@@ -21,7 +21,9 @@ from livekit.agents import (
 from livekit.agents.job import get_job_context
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import deepgram, openai, silero
+from livekit.plugins import openai, silero
+from livekit.plugins.minimax import TTS as MinimaxTTS
+from livekit.plugins.aliyun import AliSTT
 
 # uncomment to enable Krisp BVC noise cancellation, currently supported on Linux and MacOS
 # from livekit.plugins import noise_cancellation
@@ -277,8 +279,20 @@ async def entrypoint(ctx: JobContext):
         vad=ctx.proc.userdata["vad"],
         # any combination of STT, LLM, TTS, or realtime API can be used
         llm=openai.LLM(model="gpt-4o-mini"),
-        stt=deepgram.STT(model="nova-3"),
-        tts=openai.TTS(voice="ash"),
+        # Use Aliyun STT
+        stt=AliSTT(
+            # Assuming credentials are in env vars ALIYUN_COMMON_ID, ALIYUN_COMMON_SECRET
+            # Add other AliSTT options if needed (e.g., appkey, url)
+        ),
+        # Use MiniMax TTS with proper format settings
+        tts=MinimaxTTS(
+            model="speech-01-hd", 
+            voice_id="Wise_Woman",
+            sample_rate=32000,
+            audio_format="mp3",
+            bitrate=128000,
+            emotion="happy"
+        ),
         userdata=StoryData(),
     )
 

@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "livekit-plugins-aliyun"
+version = "0.1.0" # Example version
+description = "Aliyun STT plugin for LiveKit Agents"
+authors = ["Your Name <you@example.com>"] # Replace with actual author info
+# readme = "README.md" # Removed missing README
+packages = [
+    { include = "livekit" }, # Specify the top-level package directory
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+livekit-agents = ">=1.0.0" # Depends on livekit-agents
+nls = {git = "https://github.com/aliyun/alibabacloud-nls-python-sdk.git"}
+scipy = "^1.13.0" # Keep version compatible with Python 3.9
+aliyun-python-sdk-core = "^2.13.38"
+numpy = "*" # Add numpy as it's used in stt.py
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api" 

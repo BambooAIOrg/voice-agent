@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: livekit-plugins-minimax
+Version: 1.0.0
+Summary: LiveKit plugin for MiniMax services
+Author-email: LiveKit <info@livekit.io>
+Project-URL: Homepage, https://github.com/livekit/agents-python
+Project-URL: Bug Tracker, https://github.com/livekit/agents-python/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.9
+Requires-Dist: livekit-agents>=1.0.0
