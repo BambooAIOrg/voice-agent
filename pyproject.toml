@@ -17,6 +17,11 @@ scipy = "^1.13.0" # Keep version compatible with Python 3.9
 aliyun-python-sdk-core = "^2.13.38"
 numpy = "*" # Add numpy as it's used in stt.py
 livekit-plugins-noise-cancellation = ">=0.2,<1.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.40"}
+aiomysql = "^0.2.0"
+azure-cognitiveservices-speech = "^1.43.0"
+aliyun-log-python-sdk = "^0.9.19"
+loguru = "^0.7.3"
 
 [build-system]
 requires = ["poetry-core"]

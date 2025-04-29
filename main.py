@@ -26,271 +26,233 @@ from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 
-## The storyteller agent is a multi-agent that can handoff the session to another agent.
-## This example demonstrates more complex workflows with multiple agents.
-## Each agent could have its own instructions, as well as different STT, LLM, TTS,
-## or realtime models.
-
-logger = logging.getLogger("multi-agent")
+logger = logging.getLogger("multi-agent-word-learning")
 
 
+# New Base Template with placeholders
+BASE_INSTRUCTION_TEMPLATE = """
+System context:
+You are part of a multi-agent system, designed to make agent coordination and execution easy. 
+Transfers between agents are handled seamlessly in the background; do not mention or draw attention to these transfers in your conversation with the user.
 
-common_instructions = (
-    "You are an editor at a leading publishing house, with a strong track record "
-    "of discovering and nurturing new talent. You are a great communicator and ask "
-    "the right questions to get the best out of people. You want the best for your "
-    "authors, and you are not afraid to tell them when their ideas are not good enough."
-)
+Role:
+You are a friendly and patient English tutor specifically helping Chinese students learning the English word '{target_word}'. 
+Use clear and simple **Chinese** for explanations and instructions, but use English for the target word, synonyms, example sentences, etc. 
+Keep your responses very short and conversational. Ask questions frequently to ensure the student understands and stays engaged. 
+Avoid long lectures. Break down information into small, easy-to-digest pieces. Be very encouraging. 
 
-
-@dataclass
-class CharacterData:
-    # Shared data that's used by the editor agent.
-    # This structure is passed as a parameter to function calls.
-
-    name: Optional[str] = None
-    background: Optional[str] = None
+Your specific task:
+{specific_task}
+"""
 
 
 @dataclass
-class StoryData:
-    # Shared data that's used by the editor agent.
-    # This structure is passed as a parameter to function calls.
+class WordLearningData:
+    target_word: str
+    etymology_explored: bool = False
+    synonyms_explored: bool = False
+    cooccurrence_explored: bool = False
+    practice_finished: bool = False
 
-    characters: list[CharacterData] = field(default_factory=list)
-    locations: list[str] = field(default_factory=list) 
-    theme: Optional[str] = None
 
-
-class LeadEditorAgent(Agent):
-    def __init__(self) -> None:
-        super().__init__(
-            instructions=f"{common_instructions} You are the lead editor at this business, "
-            "and are yourself a generalist -- but empoly several specialist editors, "
-            "specializing in childrens' books and fiction, respectively. You trust your "
-            "editors to do their jobs, and will hand off the conversation to them when you feel "
-            "you have an idea of the right one."
-            "Your goal is to gather a few pieces of information from the user about their next"
-            "idea for a short story, and then hand off to the right agent."
-            "Start the conversation with a short introduction, then get straight to the "
-            "details. You may hand off to either editor as soon as you know which one is the right fit.",
+class GreetingAgent(Agent):
+    def __init__(self, target_word: str) -> None:
+        # Define the specific task description for this agent
+        specific_task = (
+            "Your specific role now is to welcome the student warmly in **Chinese**. "
+            "Introduce the English word you are teaching today (already mentioned in the intro). Keep the introduction very brief. "
+            "Then, ask in Chinese if they are ready to start exploring the word's origins (词源). "
+            "Once they confirm, call the 'start_etymology' function."
         )
+        # Format the BASE template with the target word and this agent's specific task
+        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
+            target_word=target_word,
+            specific_task=specific_task
+        )
+        super().__init__(instructions=formatted_instructions)
+        self.target_word = target_word
 
     async def on_enter(self):
-        # when the agent is added to the session, it'll generate a reply
-        # according to its instructions
-        self.session.generate_reply()
-
-    @function_tool
-    async def character_introduction(
-        self,
-        context: RunContext[StoryData],
-        name: str,
-        background: str,
-    ):
-        """Called when the user has provided a character.
-
-        Args:
-            name: The name of the character
-            background: The character's history, occupation, and other details
-        """
-
-        character = CharacterData(name=name, background=background)
-        context.userdata.characters.append(character)
-
-        logger.info(
-            "added character to the story: %s", name
-        )
-
-    @function_tool
-    async def location_introduction(
-        self,
-        context: RunContext[StoryData],
-        location: str,
-    ):
-        """Called when the user has provided a location.
-
-        Args:
-            location: The name of the location
-        """
-
-        context.userdata.locations.append(location)
-
-        logger.info(
-            "added location to the story: %s", location
-        )
-
-    @function_tool
-    async def theme_introduction(
-        self,
-        context: RunContext[StoryData],
-        theme: str,
-    ):
-        """Called when the user has provided a theme.
-
-        Args:
-            theme: The name of the theme
-        """
-
-        context.userdata.theme = theme
-
-        logger.info(
-            "set theme to the story: %s", theme
-        )
-
-    @function_tool
-    async def detected_childrens_book(
-        self,
-        context: RunContext[StoryData],
-    ):
-        """Called when the user has provided enough information to suggest a children's book.
-        """
-
-        childrens_editor = SpecialistEditorAgent("children's books", chat_ctx=context.session._chat_ctx)
-        # here we are creating a ChilrensEditorAgent with the full chat history,
-        # as if they were there in the room with the user the whole time.
-        # we could also omit it and rely on the userdata to share context.
-
-        logger.info(
-            "switching to the children's book editor with the provided user data: %s", context.userdata
-        )
-        return childrens_editor, "Let's switch to the children's book editor."
-
-    @function_tool
-    async def detected_novel(
-        self,
-        context: RunContext[StoryData],
-    ):
-        """Called when the user has provided enough information to suggest a children's book.
-        """
-
-        childrens_editor = SpecialistEditorAgent("novels", chat_ctx=context.session._chat_ctx)
-        # here we are creating a ChilrensEditorAgent with the full chat history,
-        # as if they were there in the room with the user the whole time.
-        # we could also omit it and rely on the userdata to share context.
-
-        logger.info(
-            "switching to the children's book editor with the provided user data: %s", context.userdata
-        )
-        return childrens_editor, "Let's switch to the children's book editor."
-
-
-class SpecialistEditorAgent(Agent):
-    def __init__(self, specialty: str, chat_ctx: Optional[ChatContext] = None) -> None:
-        super().__init__(
-            instructions=f"{common_instructions}. You specialize in {specialty}, and have "
-            "worked with some of the greats, and have even written a few books yourself.",
-            # each agent could override any of the model services, including mixing
-            # realtime and non-realtime models
-            tts=openai.TTS(voice="echo"),
-            chat_ctx=chat_ctx,
-        )
-
-    async def on_enter(self):
-        # when the agent is added to the session, we'll initiate the conversation by
-        # using the LLM to generate a reply
-        self.session.generate_reply()
-
-    @function_tool
-    async def character_introduction(
-        self,
-        context: RunContext[StoryData],
-        name: str,
-        background: str,
-    ):
-        """Called when the user has provided a character.
-
-        Args:
-            name: The name of the character
-            background: The character's history, occupation, and other details
-        """
-
-        character = CharacterData(name=name, background=background)
-        context.userdata.characters.append(character)
-
-        logger.info(
-            "added character to the story: %s", name
-        )
-
-    @function_tool
-    async def location_introduction(
-        self,
-        context: RunContext[StoryData],
-        location: str,
-    ):
-        """Called when the user has provided a location.
-
-        Args:
-            location: The name of the location
-        """
-
-        context.userdata.locations.append(location)
-
-        logger.info(
-            "added location to the story: %s", location
-        )
-
-    @function_tool
-    async def theme_introduction(
-        self,
-        context: RunContext[StoryData],
-        theme: str,
-    ):
-        """Called when the user has provided a theme.
-
-        Args:
-            theme: The name of the theme
-        """
-
-        context.userdata.theme = theme
-
-        logger.info(
-            "set theme to the story: %s", theme
-        )
-
-    @function_tool
-    async def story_finished(self, context: RunContext[StoryData]):
-        """When the editor think the broad strokes of the story have been hammered out,
-        they can stop you with their final thoughts.
-        """
-        # interrupt any existing generation
-        self.session.interrupt()
-
-        # generate a goodbye message and hang up
-        # awaiting it will ensure the message is played out before returning
+        # Reply prompt can be simpler as core instructions are set
         await self.session.generate_reply(
-            instructions="give brief but honest feedback on the story idea", allow_interruptions=False
+            instructions=f"Welcome the student warmly in Chinese. Briefly re-introduce the word '{self.target_word}' and ask if they\'re ready for etymology (词源)."
         )
 
-        job_ctx = get_job_context()
-        await job_ctx.api.room.delete_room(api.DeleteRoomRequest(room=job_ctx.room.name))
+    @function_tool
+    async def start_etymology(
+        self,
+        context: RunContext[WordLearningData],
+    ):
+        """Call this function when the student confirms they are ready to start learning about etymology."""
+        logger.info("Handing off to EtymologyAgent.")
+        etymology_agent = EtymologyAgent(target_word=context.userdata.target_word)
+        return etymology_agent, None
+
+# Placeholder for the next agent - will be implemented next
+class EtymologyAgent(Agent):
+    def __init__(self, target_word: str) -> None:
+        specific_task = (
+            "Your specific task now is to guide the student in **Chinese** to explore the *original physical meaning* of the English word '{target_word}'. "
+            "Instead of just listing facts, explore this meaning interactively. "
+            "This exploration will naturally involve discussing its origin, root, relevant affixes, and perhaps related words. "
+            "Introduce one aspect (e.g., the root's meaning, a related historical context) at a time. "
+            "Keep explanations very short and ask simple questions in Chinese after each small piece of information to ensure understanding"
+            "Wait for the student's response before proceeding. "
+            "After sufficiently exploring the core original meaning, call 'start_synonyms'."
+        )
+        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
+            target_word=target_word,
+            specific_task=specific_task
+        )
+        super().__init__(instructions=formatted_instructions)
+        self.target_word = target_word
+
+    async def on_enter(self):
+        await self.session.generate_reply(
+            instructions=f"In Chinese, start explaining the origin (来源) of '{self.target_word}'. Keep it brief. Ask if understood."
+        )
+
+    @function_tool
+    async def start_synonyms(
+        self,
+        context: RunContext[WordLearningData],
+    ):
+        """Call this function ONLY after interactively discussing origin, root, and affixes in Chinese."""
+        logger.info("Handing off to SynonymAgent after completing etymology discussion.")
+        context.userdata.etymology_explored = True
+        synonym_agent = SynonymAgent(target_word=context.userdata.target_word)
+        return synonym_agent, None
+
+
+class SynonymAgent(Agent):
+    def __init__(self, target_word: str) -> None:
+        specific_task = (
+            "Your specific task now is to discuss synonyms (同义词) interactively. "
+            "Introduce *one* English synonym or *one* key difference at a time. Explain the nuance briefly in **Chinese**. "
+            "After each point, ask the student a simple question in Chinese"
+            "Keep turns short. Wait for the student's response. "
+            "When the main synonyms/differences are covered, call 'start_cooccurrence'."
+        )
+        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
+            target_word=target_word,
+            specific_task=specific_task
+        )
+        super().__init__(instructions=formatted_instructions)
+        self.target_word = target_word
+
+    async def on_enter(self):
+        await self.session.generate_reply(
+            instructions=f"In Chinese, start discussing synonyms for '{self.target_word}'. Introduce just one aspect (e.g., one synonym or one difference). Explain briefly in Chinese. Ask a question."
+        )
+
+    @function_tool
+    async def start_cooccurrence(
+        self,
+        context: RunContext[WordLearningData],
+    ):
+        """Call this function ONLY after interactively discussing the main synonyms and differences."""
+        logger.info("Handing off to CooccurrenceAgent after completing synonym discussion.")
+        context.userdata.synonyms_explored = True
+        cooccurrence_agent = CooccurrenceAgent(target_word=context.userdata.target_word)
+        return cooccurrence_agent, None
+
+
+class CooccurrenceAgent(Agent):
+    def __init__(self, target_word: str) -> None:
+        specific_task = (
+            "Your specific task now is to discuss co-occurring words interactively. "
+            "Introduce *one type* of co-occurring English word (e.g., typical adjectives, common verbs) or *one English example phrase* at a time. Explain briefly in **Chinese**. "
+            "After each point, ask a simple question in Chinese"
+            "Keep turns short. Wait for the student's response. "
+            "When main co-occurrence patterns are covered, call 'start_practice'."
+        )
+        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
+            target_word=target_word,
+            specific_task=specific_task
+        )
+        super().__init__(instructions=formatted_instructions)
+        self.target_word = target_word
+
+    async def on_enter(self):
+        await self.session.generate_reply(
+            instructions=f"In Chinese, start discussing co-occurring words for '{self.target_word}'. Introduce just one type or example. Explain briefly in Chinese. Ask a question."
+        )
+
+    @function_tool
+    async def start_practice(
+        self,
+        context: RunContext[WordLearningData],
+    ):
+        """Call this function ONLY after interactively discussing the main co-occurrence patterns."""
+        logger.info("Handing off to SentencePracticeAgent after completing co-occurrence discussion.")
+        context.userdata.cooccurrence_explored = True
+        practice_agent = SentencePracticeAgent(target_word=context.userdata.target_word)
+        return practice_agent, None
+
+
+class SentencePracticeAgent(Agent):
+    def __init__(self, target_word: str) -> None:
+        specific_task = (
+            "Your specific role now is sentence practice. "
+            "Dynamically generate practical, conversational scenarios described in **Chinese**. Include a simple, spoken-style Chinese phrase representing the core meaning. "
+            f"Ask the student to express this meaning in English using '{target_word}'. "
+            "Provide brief, encouraging feedback on their attempt. "
+            "Continue presenting new scenarios. When you judge the student has had sufficient practice, call 'finish_practice_session'."
+        )
+        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
+            target_word=target_word,
+            specific_task=specific_task
+        )
+        super().__init__(instructions=formatted_instructions)
+        self.target_word = target_word
+
+    async def on_enter(self):
+        await self.session.generate_reply(
+            instructions=f"In Chinese, start sentence practice for '{self.target_word}'. Generate the first scenario (described in Chinese) and prompt the student for an English sentence using the word."
+        )
+
+    @function_tool
+    async def finish_practice_session(self, context: RunContext[WordLearningData]):
+        """Call this function ONLY when you decide the student has had enough practice."""
+        logger.info("LLM decided to finish practice session.")
+        context.userdata.practice_finished = True
+        await self.session.generate_reply(
+            instructions=f"Congratulate the student in Chinese on completing practice for '{self.target_word}'. Give final encouraging words in Chinese. End the session.",
+            allow_interruptions=False
+        )
+        return None
+
+# Function to get the current job context (replace if needed)
+# def get_job_context() -> JobContext:
+#     # This function needs to be implemented or imported correctly
+#     # based on how JobContext is managed in your setup.
+#     # For now, it's a placeholder.
+#     pass
 
 
 def prewarm(proc: JobProcess):
-    proc.userdata["vad"] = silero.VAD.load()
+    proc.userdata["vad"] = silero.VAD.load(min_speech_duration=0.2)
 
 
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
 
-    session = AgentSession[StoryData](
+    target_word = "extraordinary"
+
+    session = AgentSession[WordLearningData](
         vad=ctx.proc.userdata["vad"],
-        # any combination of STT, LLM, TTS, or realtime API can be used
-        llm=openai.LLM(model="gpt-4o-mini"),
-        # Use Aliyun STT
+        llm=openai.LLM(model="gpt-4.1"),
         stt=AliSTT(),
-        # Use MiniMax TTS with proper format settings
         tts=MinimaxTTS(
-            model="speech-02-hd", 
+            model="speech-02-hd",
             voice_id="Cantonese_CuteGirl",
             sample_rate=32000,
             bitrate=128000,
             emotion="happy"
         ),
-        userdata=StoryData(),
+        userdata=WordLearningData(target_word=target_word),
     )
 
-    # log metrics as they are emitted, and total usage after session is over
     usage_collector = metrics.UsageCollector()
 
     @session.on("metrics_collected")
@@ -305,10 +267,10 @@ async def entrypoint(ctx: JobContext):
     ctx.add_shutdown_callback(log_usage)
 
     await session.start(
-        agent=LeadEditorAgent(),
+        # Pass target_word when creating the first agent
+        agent=GreetingAgent(target_word=target_word),
         room=ctx.room,
         room_input_options=RoomInputOptions(
-            # uncomment to enable Krisp BVC noise cancellation
             noise_cancellation=noise_cancellation.BVC(),
         ),
         room_output_options=RoomOutputOptions(transcription_enabled=True),
