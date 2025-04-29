@@ -287,7 +287,7 @@ async def entrypoint(ctx: JobContext):
         # Use MiniMax TTS with proper format settings
         tts=MinimaxTTS(
             model="speech-02-hd", 
-            voice_id="Wise_Woman",
+            voice_id="Cantonese_CuteGirl",
             sample_rate=32000,
             bitrate=128000,
             emotion="happy"
