@@ -16,6 +16,7 @@ nls = {git = "https://github.com/aliyun/alibabacloud-nls-python-sdk.git"}
 scipy = "^1.13.0" # Keep version compatible with Python 3.9
 aliyun-python-sdk-core = "^2.13.38"
 numpy = "*" # Add numpy as it's used in stt.py
+livekit-plugins-noise-cancellation = ">=0.2,<1.0"
 
 [build-system]
 requires = ["poetry-core"]

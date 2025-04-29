@@ -22,11 +22,9 @@ from livekit.agents.job import get_job_context
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
 from livekit.plugins import openai, silero
+from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
-
-# uncomment to enable Krisp BVC noise cancellation, currently supported on Linux and MacOS
-# from livekit.plugins import noise_cancellation
 
 ## The storyteller agent is a multi-agent that can handoff the session to another agent.
 ## This example demonstrates more complex workflows with multiple agents.
@@ -280,10 +278,7 @@ async def entrypoint(ctx: JobContext):
         # any combination of STT, LLM, TTS, or realtime API can be used
         llm=openai.LLM(model="gpt-4o-mini"),
         # Use Aliyun STT
-        stt=AliSTT(
-            # Assuming credentials are in env vars ALIYUN_COMMON_ID, ALIYUN_COMMON_SECRET
-            # Add other AliSTT options if needed (e.g., appkey, url)
-        ),
+        stt=AliSTT(),
         # Use MiniMax TTS with proper format settings
         tts=MinimaxTTS(
             model="speech-02-hd", 
@@ -314,7 +309,7 @@ async def entrypoint(ctx: JobContext):
         room=ctx.room,
         room_input_options=RoomInputOptions(
             # uncomment to enable Krisp BVC noise cancellation
-            # noise_cancellation=noise_cancellation.BVC(),
+            noise_cancellation=noise_cancellation.BVC(),
         ),
         room_output_options=RoomOutputOptions(transcription_enabled=True),
     )

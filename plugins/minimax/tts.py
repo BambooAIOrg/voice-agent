@@ -438,8 +438,7 @@ class SynthesizeStream(tts.SynthesizeStream):
                     "bitrate": self._opts.bitrate,
                     "format": "pcm",
                     "channel": self._opts.channels
-                },
-                "language_boost": "auto"
+                }
             }
             logger.debug(f"[{self._request_id}] Sending task_start message: {start_msg}")
             await self._ws.send_json(start_msg)
