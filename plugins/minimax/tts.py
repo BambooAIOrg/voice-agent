@@ -1,17 +1,3 @@
-# Copyright 2023 LiveKit, Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 import asyncio
@@ -22,6 +8,7 @@ import tempfile
 import weakref
 from dataclasses import dataclass
 from typing import Any, Literal, Optional, Union
+from wsgiref.util import request_uri
 
 import aiohttp
 
@@ -30,6 +17,7 @@ from livekit.agents import (
     APIConnectOptions,
     APIStatusError,
     APITimeoutError,
+    APIError,
     tokenize,
     tts,
     utils,
@@ -80,7 +68,6 @@ class _TTSOptions:
     language: NotGivenOr[TTSLanguages | str]
     base_url: str
     # Audio settings
-    audio_format: AudioFormatType
     bitrate: BitrateType
     channels: ChannelType
 
@@ -102,7 +89,6 @@ class TTS(tts.TTS):
         speed: NotGivenOr[TTSVoiceSpeed | str] = NOT_GIVEN,
         emotion: NotGivenOr[TTSVoiceEmotion | str] = NOT_GIVEN,
         sample_rate: SampleRateType = 32000,
-        audio_format: AudioFormatType = "mp3",
         bitrate: BitrateType = 128000,
         channels: ChannelType = 1,
         api_key: NotGivenOr[str] = NOT_GIVEN,
@@ -124,7 +110,6 @@ class TTS(tts.TTS):
             emotion (TTSVoiceEmotion, optional): Voice emotion type
             sample_rate (int, optional): The audio sample rate in Hz. Defaults to 32000.
                                          Available options: 8000, 16000, 22050, 24000, 32000, 44100
-            audio_format (str, optional): Format of generated sound. Options: "mp3", "pcm", "flac". Defaults to "mp3".
             bitrate (int, optional): Bitrate of generated sound. Options: 32000, 64000, 128000, 256000. Defaults to 128000.
             channels (int, optional): Number of channels for the audio. 1 for mono, 2 for stereo. Defaults to 1.
             api_key (str, optional): The Minimax API key. If not provided, it will be read from the MINIMAX_API_KEY environment variable.
@@ -164,7 +149,6 @@ class TTS(tts.TTS):
             api_key=minimax_api_key,
             group_id=minimax_group_id,
             base_url=base_url,
-            audio_format=audio_format,
             bitrate=bitrate,
             channels=channels,
         )
@@ -375,7 +359,8 @@ class ChunkedStream(tts.ChunkedStream):
 
 
 class SynthesizeStream(tts.SynthesizeStream):
-    """A stream that processes text incrementally as it arrives using WebSocket."""
+    """A stream that processes text incrementally as it arrives using WebSocket,
+       similar to Cartesia's implementation pattern."""
 
     def __init__(
         self,
@@ -384,56 +369,60 @@ class SynthesizeStream(tts.SynthesizeStream):
         opts: _TTSOptions,
         session: aiohttp.ClientSession,
     ):
-        super().__init__(tts=tts)
+        super().__init__(tts=tts, conn_options=tts._conn_options)
         self._tts = tts
         self._opts = opts
         self._session = session
-        self._task: Optional[asyncio.Task] = None
-        self._input_queue = asyncio.Queue[str]()
-        self._stopping = False
-        self._ws = None
-        self._audio_bytes = bytearray()
-        self._audio_event = asyncio.Event()
-        self._completion_event = asyncio.Event()
-        self._error_msg: Optional[str] = None
-
+        self._ws: aiohttp.ClientWebSocketResponse | None = None
+        self._task_started = False
+        
+        # Use a basic sentence tokenizer (can adjust buffer settings if needed)
+        self._sent_tokenizer_stream = tokenize.basic.SentenceTokenizer().stream() 
+        self._request_id = utils.shortuuid() # Generate a request ID for this stream
+        
     def _ensure_session(self) -> aiohttp.ClientSession:
         if not self._session:
             self._session = utils.http_context.http_session()
         return self._session
 
     async def _run(self) -> None:
+        """Main task managing WebSocket connection and sub-tasks."""
+        tasks = []
         try:
-            # Connect to WebSocket
+            # Ensure tokenizer is reset for each attempt (including retries)
+            self._sent_tokenizer_stream = tokenize.basic.SentenceTokenizer().stream()
+            self._task_started = False # Reset task started flag
+
+            session = self._ensure_session()
             url = self._opts.get_ws_url(f"/ws/v1/t2a_v2")
             headers = {API_KEY_HEADER: self._opts.api_key}
-            
-            # Ensure aiohttp session exists (using self._session from __init__)
-            session = self._ensure_session()
 
-            logger.debug(f"Attempting WebSocket connection to: {url}")
-            self._ws = await session.ws_connect(
-                url,
-                headers=headers,
-                heartbeat=30.0
+            logger.debug(f"[{self._request_id}] Attempting WebSocket connection to: {url}")
+            self._ws = await asyncio.wait_for(
+                session.ws_connect(url, headers=headers, heartbeat=30.0),
+                timeout=self._conn_options.timeout
             )
-            logger.debug("WebSocket connect call completed.")
+            logger.info(f"[{self._request_id}] WebSocket connected.")
 
             # Wait for connected_success
-            logger.debug("Waiting for 'connected_success' event...")
+            logger.debug(f"[{self._request_id}] Waiting for 'connected_success'...")
             async for msg in self._ws:
-                logger.debug(f"Received WebSocket message during connect phase - Type: {msg.type}")
                 if msg.type == aiohttp.WSMsgType.TEXT:
-                    logger.debug(f"WebSocket TEXT data during connect: {msg.data}")
                     data = json.loads(msg.data)
                     if data.get("event") == "connected_success":
-                        logger.info("WebSocket connection established")
+                        logger.info(f"[{self._request_id}] Received connected_success.")
                         break
+                    else:
+                        # Handle potential errors during connection phase
+                        err_msg = data.get("base_resp", {}).get("status_msg", "Unknown connection error")
+                        logger.error(f"[{self._request_id}] Error during connection: {err_msg}")
+                        raise APIConnectionError(f"Connection failed: {err_msg}")
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
-                    logger.error(f"WebSocket closed unexpectedly during connect. Type: {msg.type}, Data: {msg.data}")
-                    raise APIConnectionError("WebSocket connection failed")
+                    err = self._ws.exception() or f"Connection closed unexpectedly (Type: {msg.type})"
+                    logger.error(f"[{self._request_id}] WebSocket error/closed during connect phase: {err}")
+                    raise APIConnectionError(str(err))
             
-            # Send task_start
+            # Send task_start first
             start_msg = {
                 "event": "task_start",
                 "model": self._opts.model,
@@ -447,218 +436,230 @@ class SynthesizeStream(tts.SynthesizeStream):
                 "audio_setting": {
                     "sample_rate": self._opts.sample_rate,
                     "bitrate": self._opts.bitrate,
-                    "format": self._opts.audio_format,
+                    "format": "pcm",
                     "channel": self._opts.channels
                 }
             }
-            logger.debug(f"Sending task_start message: {start_msg}")
+            logger.debug(f"[{self._request_id}] Sending task_start message: {start_msg}")
             await self._ws.send_json(start_msg)
-            
-            # Process task_started response
-            logger.debug("Waiting for 'task_started' event...")
+
+            # Now, wait for task_started response BEFORE starting other tasks
+            logger.debug(f"[{self._request_id}] Waiting for 'task_started'...")
             async for msg in self._ws:
-                logger.debug(f"Received WebSocket message during task start phase - Type: {msg.type}")
-                if msg.type == aiohttp.WSMsgType.TEXT:
-                    logger.debug(f"WebSocket TEXT data during task start: {msg.data}")
+                 if msg.type == aiohttp.WSMsgType.TEXT:
                     data = json.loads(msg.data)
                     if data.get("event") == "task_started":
-                        logger.info("TTS task started")
-                        break
+                        logger.info(f"[{self._request_id}] Received task_started.")
+                        self._task_started = True
+                        self._mark_started() # Mark stream started for metrics
+                        break # Stop listening for task_started
                     elif data.get("event") == "error":
-                        logger.error(f"Received error during task start: {data.get('message', 'Unknown error')}")
-                        raise APIStatusError(
-                            f"Failed to start TTS task: {data.get('message', 'Unknown error')}",
-                            status_code=400,
-                        )
-                elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
-                    logger.error(f"WebSocket closed unexpectedly during task start. Type: {msg.type}, Data: {msg.data}")
-                    raise APIConnectionError("WebSocket connection closed unexpectedly")
-            
-            # Process input queue
-            logger.debug("Starting main loop to process input queue and receive audio.")
-            while not self._stopping:
-                try:
-                    # Wait for input with timeout
-                    text = await asyncio.wait_for(self._input_queue.get(), timeout=0.1)
-                    logger.debug(f"Got text from input queue: '{text}'")
-                    
-                    if text:
-                        # Send continue request
-                        send_payload = {
-                            "event": "task_continue",
-                            "text": text
-                        }
-                        logger.debug(f"Sending task_continue with payload: {send_payload}")
-                        await self._ws.send_json(send_payload)
-                        logger.debug(f"Successfully sent task_continue for text: '{text}'")
-                        
-                        # Collect audio chunks
-                        logger.debug("Waiting for audio chunks...")
-                        while True:
-                            logger.debug("Waiting for next message from WebSocket...")
-                            try:
-                                msg = await self._ws.receive()
-                                logger.debug(f"Received WebSocket message - Type: {msg.type}, Raw Data: {msg.data}")
+                        err_msg = data.get("message", "Unknown error starting task")
+                        logger.error(f"[{self._request_id}] Error starting TTS task: {err_msg}")
+                        raise APIStatusError(f"Failed to start TTS task: {err_msg}", status_code=400)
+                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                     err = self._ws.exception() or f"Connection closed unexpectedly (Type: {msg.type}) while waiting for task_started"
+                     logger.error(f"[{self._request_id}] WebSocket error/closed during task start: {err}")
+                     raise APIConnectionError(str(err))
 
-                                if msg.type == aiohttp.WSMsgType.TEXT:
-                                    logger.debug(f"WebSocket TEXT data: {msg.data}")
-                                    data = json.loads(msg.data)
-                                    if data.get("event") == "error":
-                                        logger.error(f"Minimax returned error during streaming: {data.get('message', 'Unknown error')}")
-                                        self._error_msg = data.get('message', 'Unknown error')
+            # If we didn't get task_started, something went wrong (error already raised)
+            if not self._task_started:
+                 # This path should ideally not be reached due to exceptions above, but as a safeguard:
+                 raise APIConnectionError("Failed to receive task_started confirmation.")
 
-                                    if "data" in data and "audio" in data["data"]:
-                                        # Decode hex audio data
-                                        audio_hex = data["data"]["audio"]
-                                        logger.debug(f"Received audio hex chunk (first 50 chars): {audio_hex[:50]}...")
-                                        try:
-                                            audio_data = bytes.fromhex(audio_hex)
-                                            logger.debug(f"Decoded {len(audio_data)} bytes of audio data.")
-                                            # Add to buffer
-                                            self._audio_bytes.extend(audio_data)
-                                            self._audio_event.set()
-                                        except ValueError as hex_e:
-                                            logger.exception("Failed to decode hex audio data")
+            # Create and run input, send, and receive tasks ONLY after task_started
+            input_task = asyncio.create_task(self._input_task(), name=f"minimax_tts_input_{self._request_id}")
+            send_task = asyncio.create_task(self._send_task(self._ws), name=f"minimax_tts_send_{self._request_id}")
+            recv_task = asyncio.create_task(self._recv_task(self._ws), name=f"minimax_tts_recv_{self._request_id}")
 
-                                    if data.get("is_final"):
-                                        logger.debug("Received 'is_final' flag from Minimax.")
-                                        break
-                                elif msg.type == aiohttp.WSMsgType.BINARY:
-                                    logger.warning(f"Received unexpected BINARY WebSocket message: {len(msg.data)} bytes")
-                                elif msg.type == aiohttp.WSMsgType.CLOSED:
-                                    logger.warning(f"WebSocket connection closed by peer during audio reception. Message data: {msg.data}")
-                                    raise APIConnectionError("WebSocket connection closed unexpectedly during audio reception")
-                                elif msg.type == aiohttp.WSMsgType.ERROR:
-                                    logger.error(f"WebSocket error during audio reception: {self._ws.exception()}")
-                                    raise APIConnectionError("WebSocket error during audio reception")
-                                else:
-                                    logger.warning(f"Received unhandled WebSocket message type: {msg.type}")
-                            except Exception as receive_exc:
-                                logger.exception("Error during WebSocket message reception/processing:")
-                                self._error_msg = str(receive_exc)
-                                break
+            # Wait for tasks to complete or cancel if one fails
+            tasks = [input_task, send_task, recv_task]
+            await asyncio.gather(*tasks)
 
-                    # Mark the task as done
-                    self._input_queue.task_done()
-                except asyncio.TimeoutError:
-                    continue
-                except asyncio.CancelledError:
-                    logger.info("TTS stream task cancelled.")
-                    if self._ws and not self._ws.closed:
-                        try:
-                            logger.debug("Sending task_finish due to cancellation.")
-                            await self._ws.send_json({"event": "task_finish"})
-                        except Exception as finish_e:
-                             logger.exception("Exception sending task_finish on cancellation:")
-                    raise
-                except Exception as loop_e:
-                    logger.exception("Unhandled exception in TTS stream main loop:")
-                    self._error_msg = str(loop_e)
-                    break
-        except asyncio.CancelledError:
-             logger.info("TTS stream setup or start cancelled.")
-             if self._ws and not self._ws.closed:
-                 await self._ws.close()
-             raise
-        except Exception as setup_e:
-            logger.exception(f"Error setting up or starting TTS synthesize stream:")
-            self._error_msg = str(setup_e)
+        except APIError as e: # Catch APIErrors specifically for retry logic in base class
+            logger.error(f"[{self._request_id}] API Error in TTS stream: {e}", exc_info=False)
+            # Ensure other tasks are cancelled if one fails with APIError
+            for task in tasks:
+                 if not task.done():
+                      task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True) # Wait for cancellation
+            raise # Re-raise for base class retry mechanism
+        except Exception as e:
+            logger.exception(f"[{self._request_id}] Unhandled exception in TTS synthesize stream _run:")
+             # Ensure other tasks are cancelled on unhandled exceptions
+            for task in tasks:
+                 if not task.done():
+                      task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True) # Wait for cancellation
+            self._emit_error(APIConnectionError(f"Unhandled stream error: {e}"), recoverable=False)
+            raise APIConnectionError(f"Unhandled stream error: {e}") from e
         finally:
+            # Ensure ws is closed when recv_task exits for any reason
             if self._ws and not self._ws.closed:
-                try:
-                    exception_occurred = self._error_msg is not None
-                    is_cancelled = False
-                    try:
-                        current_task = asyncio.current_task()
-                        if current_task and current_task.cancelled():
-                            is_cancelled = True
-                    except AttributeError:
-                        pass
-                    except RuntimeError:
-                        pass
-
-                    if not is_cancelled and not exception_occurred:
-                       logger.debug("Sending task_finish in finally block.")
-                       await self._ws.send_json({"event": "task_finish"})
-
-                    await self._ws.close()
-                    logger.debug("WebSocket connection closed in finally block.")
-                except Exception as close_e:
-                     logger.exception("Exception while closing WebSocket in finally:")
+                 try:
+                     await self._ws.close()
+                     logger.debug(f"[{self._request_id}] WebSocket closed in _recv_task finally.")
+                 except Exception as close_e:
+                     logger.warning(f"[{self._request_id}] Exception closing WebSocket in _recv_task finally: {close_e}", exc_info=False)
             
-            logger.debug("Setting completion event.")
-            self._completion_event.set()
+            logger.debug(f"[{self._request_id}] SynthesizeStream _run finished.")
+            
+    async def _input_task(self) -> None:
+        """Reads text from the input channel and pushes it to the tokenizer."""
+        logger.debug(f"[{self._request_id}] _input_task started, waiting for text...")
+        try:
+            async for data_item in self._input_ch:
+                logger.debug(f"[{self._request_id}] _input_task received item: {type(data_item)}")
+                if isinstance(data_item, self._FlushSentinel):
+                    logger.debug(f"[{self._request_id}] Flushing tokenizer stream.")
+                    self._sent_tokenizer_stream.flush()
+                    continue
+                
+                logger.debug(f"[{self._request_id}] Pushing text to tokenizer: '{data_item[:50]}...'")
+                self._sent_tokenizer_stream.push_text(data_item)
 
-    async def read(self, n: int = -1) -> bytes:
-        """Read audio data from the stream."""
-        if self._error_msg:
-            raise RuntimeError(self._error_msg)
+            logger.debug(f"[{self._request_id}] Input channel closed, ending tokenizer input.")
+            self._sent_tokenizer_stream.end_input()
+        except asyncio.CancelledError:
+            logger.info(f"[{self._request_id}] Input task cancelled.")
+            self._sent_tokenizer_stream.end_input()
+            raise
+        except Exception as e:
+            logger.exception(f"[{self._request_id}] Error in _input_task:")
+            self._sent_tokenizer_stream.end_input()
+            raise
 
-        # Ensure stream is started
-        if self._task is None:
-            await self.start()
+    async def _send_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
+        """Reads tokens from the tokenizer and sends them to the WebSocket."""
+        try:
+            # Now process tokens from the tokenizer immediately
+            async for ev in self._sent_tokenizer_stream:
+                token = ev.token
+                if not token.strip(): # Avoid sending empty strings
+                    continue
+                    
+                send_payload = {
+                    "event": "task_continue",
+                    "text": token
+                }
+                logger.debug(f"[{self._request_id}] Sending task_continue with token: '{token[:50]}...'")
+                await ws.send_json(send_payload)
+                logger.debug(f"[{self._request_id}] Successfully sent task_continue.")
 
-        # Wait for some data to be available
-        if not self._audio_bytes and not self._completion_event.is_set():
-            audio_wait = asyncio.create_task(self._audio_event.wait())
-            completion_wait = asyncio.create_task(self._completion_event.wait())
-            await asyncio.wait(
-                [audio_wait, completion_wait],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            if not audio_wait.done():
-                audio_wait.cancel()
-            if not completion_wait.done():
-                completion_wait.cancel()
-            self._audio_event.clear()
+            logger.debug(f"[{self._request_id}] Tokenizer stream finished.")
+            
+            # Send task_finish to server to signal end of text
+            logger.info(f"[{self._request_id}] Sending task_finish event.")
+            await ws.send_json({"event": "task_finish"})
 
-        if not self._audio_bytes and self._error_msg is not None:
-            raise RuntimeError(self._error_msg)
+        except Exception as e:
+            logger.exception(f"[{self._request_id}] Error in _send_task: {e}")
+            # Propagate error to potentially cancel other tasks
+            raise
 
-        # Return all available data if n is -1
-        if n == -1:
-            data = bytes(self._audio_bytes)
-            self._audio_bytes.clear()
-            return data
+    async def _recv_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
+        """Receives messages from the WebSocket and processes audio/errors."""
+        # Create an AudioByteStream to handle chunking into AudioFrames
+        audio_bstream = utils.audio.AudioByteStream(self._opts.sample_rate, self._opts.channels)
+        emitter = tts.SynthesizedAudioEmitter(
+            event_ch=self._event_ch,
+            request_id=self._request_id,
+        )       
+        try:
+            while True:
+                # Wait indefinitely until task_started is confirmed by _send_task 
+                # or until _send_task fails/completes
+                if not self._task_started:
+                    await asyncio.sleep(0.05) # Small sleep to prevent busy-waiting
+                    # Check if ws is closed, indicating failure in _send_task before task_started
+                    if ws.closed:
+                       logger.warning(f"[{self._request_id}] WebSocket closed before task was started, exiting recv task.")
+                       break
+                    continue
+                    
+                logger.debug(f"[{self._request_id}] Waiting for message (timeout={self._conn_options.timeout}s)...")
+                msg = await asyncio.wait_for(ws.receive(), timeout=self._conn_options.timeout)
 
-        # Otherwise, return at most n bytes
-        if len(self._audio_bytes) <= n:
-            data = bytes(self._audio_bytes)
-            self._audio_bytes.clear()
-            return data
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    logger.debug(f"[{self._request_id}] WebSocket TEXT received: {msg.data[:100]}...")
+                    data = json.loads(msg.data)
+                    api_error = data.get("event") == "error"
+                    audio_present = "data" in data and "audio" in data["data"]
+                    is_final = data.get("is_final", False)
 
-        data = bytes(self._audio_bytes[:n])
-        del self._audio_bytes[:n]
-        return data
+                    if api_error:
+                        error_msg = data.get('message', 'Unknown streaming error')
+                        logger.error(f"[{self._request_id}] Minimax returned error: {error_msg}")
+                        self._emit_error(APIStatusError(error_msg, status_code=400), recoverable=False)
+                        # Decide if error is fatal, maybe break? depends on API behavior
+                        # For now, continue listening in case more data/errors come
 
-    async def start(self) -> None:
-        """Start the synthesize stream."""
-        if self._task is None:
-            self._task = asyncio.create_task(self._run())
+                    if audio_present:
+                        audio_hex = data["data"]["audio"]
+                        try:
+                            # Decode the hex data first
+                            audio_data = bytes.fromhex(audio_hex)
+                            logger.debug(f"[{self._request_id}] Decoded {len(audio_data)} audio bytes.")
+                            
+                            # Feed the raw PCM bytes into the AudioByteStream
+                            # and push the resulting frames using the emitter
+                            for frame in audio_bstream.write(audio_data):
+                                emitter.push(frame)
+                                logger.debug(f"[{self._request_id}] Pushed frame of duration {frame.duration:.3f}s")
+                                
+                        except ValueError as hex_e:
+                            logger.exception(f"[{self._request_id}] Failed to decode hex audio:")
+                            self._emit_error(APIError(f"Failed to decode hex audio: {hex_e}"), recoverable=False)
+                        except Exception as frame_e:
+                             logger.exception(f"[{self._request_id}] Failed to process audio bytes or push frame:")
+                             self._emit_error(APIError(f"Failed to process audio: {frame_e}"), recoverable=False)
 
-    async def write(self, text: str) -> None:
-        """
-        Write text to the stream for synthesis.
+                    if is_final:
+                        logger.debug(f"[{self._request_id}] Received is_final=True. Flushing audio stream and emitter.")
+                        # Flush any remaining buffered audio in AudioByteStream
+                        for frame in audio_bstream.flush():
+                             emitter.push(frame)
+                             logger.debug(f"[{self._request_id}] Pushed flushed frame of duration {frame.duration:.3f}s")
+                        # Mark the end of the segment for this text chunk
+                        emitter.flush() 
 
-        Args:
-            text: The text to synthesize.
-        """
-        if self._task is None:
-            await self.start()
+                elif msg.type == aiohttp.WSMsgType.BINARY:
+                    logger.warning(f"[{self._request_id}] Received unexpected BINARY message: {len(msg.data)} bytes")
+                elif msg.type == aiohttp.WSMsgType.CLOSED or msg.type == aiohttp.WSMsgType.CLOSING:
+                    logger.info(f"[{self._request_id}] WebSocket {msg.type.name} message received. Assuming clean completion.")
+                    break # Connection closed, end the loop
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    err = ws.exception() or "Unknown WebSocket error"
+                    logger.error(f"[{self._request_id}] WebSocket ERROR message received: {err}")
+                    raise APIConnectionError(f"WebSocket error: {err}")
+                else:
+                    logger.warning(f"[{self._request_id}] Received unhandled WebSocket message type: {msg.type}")
 
-        await self._input_queue.put(text)
-
-    async def aclose(self) -> None:
-        """Close the stream and cancel any running tasks."""
-        self._stopping = True
-        if self._task:
-            self._task.cancel()
+        except asyncio.TimeoutError:
+            # Standard timeout occurred - server didn't respond or close connection in time
+            logger.error(f"[{self._request_id}] Timeout waiting for WebSocket message or closure.")
+            raise APITimeoutError("Timeout waiting for Minimax message or closure")
+        except asyncio.CancelledError:
+            logger.info(f"[{self._request_id}] Receive task cancelled.")
+            raise
+        except Exception as e:
+            logger.exception(f"[{self._request_id}] Error in _recv_task:")
+            # Propagate error
+            raise
+        finally:
+            # Ensure any remaining audio in the buffer is flushed when the task ends
             try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
-            finally:
-                self._task = None
+                logger.debug(f"[{self._request_id}] Flushing final audio bytes in _recv_task finally block.")
+                for frame in audio_bstream.flush():
+                    emitter.push(frame)
+                    logger.debug(f"[{self._request_id}] Pushed final flushed frame of duration {frame.duration:.3f}s")
+                # Mark the absolute end of the stream if the task is ending cleanly
+                # However, the emitter flush is usually tied to is_final=True from the API
+                # self._emitter.flush() # Reconsider if this is needed here
+            except Exception as flush_e:
+                 logger.exception(f"[{self._request_id}] Error flushing audio buffer in finally block:")
+                 
+            logger.debug(f"[{self._request_id}] Receive task finished.")
 
 
 def _to_minimax_options(opts: _TTSOptions) -> dict[str, Any]:
