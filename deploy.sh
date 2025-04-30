@@ -31,9 +31,9 @@ sudo find $DEPLOY_DIR -mindepth 1 -delete
 
 # --- Copy Application Files ---
 echo "Copying application files to deployment directory..."
-# Copies all files and directories from the current location (where deploy.sh is)
-# to the target deployment directory.
-sudo cp -R ./* "$DEPLOY_DIR/" || { echo "Failed to copy application files"; exit 1; }
+# Copies all files and directories (including hidden ones) from the current location
+# to the target deployment directory, preserving attributes.
+sudo cp -a . "$DEPLOY_DIR/" || { echo "Failed to copy application files"; exit 1; }
 
 # --- Systemd Service Configuration ---
 echo "Creating/Updating systemd service file..."
