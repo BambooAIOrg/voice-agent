@@ -1,5 +1,14 @@
+# Environment variables
 .env.local
+
+# Virtual environment
 venv/
+*/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS generated files
 .DS_Store
-*/__pycache__/
 */.DS_Store
