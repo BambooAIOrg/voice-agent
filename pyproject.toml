@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "multi-agent-python"
+name = "vocab-agent"
 version = "0.1.0"
 description = "Multi-agent system using LiveKit"
 authors = ["User"]

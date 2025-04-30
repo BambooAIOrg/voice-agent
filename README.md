@@ -21,7 +21,7 @@ A basic example of a multi-agent workflow using LiveKit and the Python [Agents F
 Clone the repository and install dependencies to a virtual environment:
 
 ```console
-cd multi-agent-python
+cd vocab-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
