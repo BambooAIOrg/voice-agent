@@ -5,7 +5,6 @@ set -e # Exit immediately if a command exits with a non-zero status.
 echo "Starting Deployment Process..."
 
 # --- Configuration ---
-ARTIFACT_NAME="vocab-agent-artifact.tar.gz"
 # Destination directory for the application on the server
 DEPLOY_DIR="/opt/vocab-agent"
 # Name for the systemd service
@@ -27,14 +26,14 @@ sudo mkdir -p $DEPLOY_DIR
 # Set ownership if using a non-root user: sudo chown -R $SERVICE_USER:$SERVICE_USER $DEPLOY_DIR
 
 echo "Cleaning up old deployment..."
-# Remove old files before extracting new ones
+# Remove old files before copying new ones
 sudo find $DEPLOY_DIR -mindepth 1 -delete
 
-# --- Artifact Extraction ---
-echo "Extracting artifact..."
-# Assumes the artifact is in the current directory where the script is run
-# Cloud Efficiency might place it elsewhere, adjust the source path if needed.
-sudo tar -xzf $ARTIFACT_NAME -C $DEPLOY_DIR || { echo "Failed to extract artifact"; exit 1; }
+# --- Copy Application Files ---
+echo "Copying application files to deployment directory..."
+# Copies all files and directories from the current location (where deploy.sh is)
+# to the target deployment directory.
+sudo cp -R ./* "$DEPLOY_DIR/" || { echo "Failed to copy application files"; exit 1; }
 
 # --- Systemd Service Configuration ---
 echo "Creating/Updating systemd service file..."
