@@ -1,50 +1,82 @@
-<a href="https://livekit.io/">
-  <img src="./.github/assets/livekit-mark.png" alt="LiveKit logo" width="100" height="100">
-</a>
+# Vocab Agent
 
-# Python Multi-Agent Example
+A multi-agent system using [LiveKit Agents](https://github.com/livekit/agents) designed as an interactive English vocabulary tutor for Chinese-speaking students.
 
-<p>
-  <a href="https://cloud.livekit.io/projects/p_/sandbox"><strong>Deploy a sandbox app</strong></a>
-  •
-  <a href="https://docs.livekit.io/agents/overview/">LiveKit Agents Docs</a>
-  •
-  <a href="https://livekit.io/cloud">LiveKit Cloud</a>
-  •
-  <a href="https://blog.livekit.io/">Blog</a>
-</p>
+## Overview
 
-A basic example of a multi-agent workflow using LiveKit and the Python [Agents Framework](https://github.com/livekit/agents).
+This project implements a sequence of specialized agents that guide a user through learning an English word. The agents handle different stages:
 
-## Dev Setup
+1.  **GreetingAgent:** Welcomes the student and introduces the target word.
+2.  **EtymologyAgent:** Interactively explores the word's origins and roots.
+3.  **SynonymAgent:** Discusses synonyms and nuances.
+4.  **CooccurrenceAgent:** Explains common word pairings and usage patterns.
+5.  **SentencePracticeAgent:** Provides scenarios for the student to practice using the word in sentences.
 
-Clone the repository and install dependencies to a virtual environment:
+The agents primarily communicate instructions and explanations in **Chinese**, while using English for the target vocabulary and examples. It utilizes various services for LLM (OpenAI), STT (Aliyun), and TTS (Minimax).
 
-```console
-cd vocab-agent
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+## Project Structure
 
-Set up the environment by copying `.env.example` to `.env.local` and filling in the required values:
+-   `main.py`: Main application entry point, defines the agent sequence and initializes the LiveKit Agent worker.
+-   `models/`: Contains data structures (e.g., `WordLearningData`). (Further details depend on content).
+-   `plugins/`: Contains custom plugin integrations, such as `aliyun/stt.py` and `minimax/tts.py`.
+-   `logger.py`: Sets up custom logging for the application.
+-   `pyproject.toml` / `poetry.lock`: Defines project dependencies managed by Poetry.
+-   `.env.local`: Stores required API keys and configuration (copy from `.env.example`).
+-   `build.sh` / `deploy.sh`: Scripts for building and deploying the agent (likely as a container).
+-   `taskfile.yaml`: Defines tasks runnable with `task`.
 
-- `LIVEKIT_URL`
-- `LIVEKIT_API_KEY`
-- `LIVEKIT_API_SECRET`
-- `OPENAI_API_KEY`
-- `DEEPGRAM_API_KEY`
+## Setup
 
-You can also do this automatically using the LiveKit CLI:
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository_url>
+    cd vocab-agent
+    ```
+
+2.  **Install dependencies using Poetry:**
+    Make sure you have [Poetry](https://python-poetry.org/docs/#installation) installed.
+    ```bash
+    poetry install
+    ```
+
+3.  **Set up environment variables:**
+    Copy the example environment file and fill in the required credentials:
+    ```bash
+    cp .env.example .env.local
+    # Edit .env.local with your API keys and LiveKit details
+    ```
+    You will likely need:
+    *   `LIVEKIT_URL`
+    *   `LIVEKIT_API_KEY`
+    *   `LIVEKIT_API_SECRET`
+    *   `OPENAI_API_KEY`
+    *   Aliyun NLS credentials (`ALIYUN_ACCESS_KEY_ID`, `ALIYUN_ACCESS_KEY_SECRET`, `ALIYUN_APP_KEY`) - *Verify exact names needed from `plugins/aliyun/stt.py`*
+    *   Minimax credentials (`MINIMAX_GROUP_ID`, `MINIMAX_API_KEY`) - *Verify exact names needed from `plugins/minimax/tts.py`*
+    *   *(Add any other required variables, e.g., for logging, database, Azure)*
+
+## Running the Agent
+
+Activate the virtual environment managed by Poetry and run the main script:
 
 ```bash
-lk app env
+poetry run python main.py dev
 ```
 
-Run the agent:
+This will start the LiveKit agent worker. You will need a frontend application (like those in [livekit-examples](https://github.com/livekit-examples) or a custom one) to connect to the LiveKit room and interact with the agent.
 
-```console
-python3 main.py dev
+## Building and Deployment
+
+Use the provided scripts for building and deploying:
+
+```bash
+# Example: Build a Docker image (check script content for details)
+./build.sh
+
+# Example: Deploy the agent (check script content for details)
+./deploy.sh
 ```
+Refer to the contents of `build.sh` and `deploy.sh` for specific instructions and requirements (e.g., Docker, target deployment environment).
 
-This agent requires a frontend application to communicate with. You can use one of our example frontends in [livekit-examples](https://github.com/livekit-examples/), create your own following one of our [client quickstarts](https://docs.livekit.io/realtime/quickstarts/), or test instantly against one of our hosted [Sandbox](https://cloud.livekit.io/projects/p_/sandbox) frontends.
+## License
+
+This project is licensed under the terms of the LICENSE file.
