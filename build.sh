@@ -25,7 +25,7 @@ poetry config virtualenvs.in-project true
 echo "Locking dependencies (based on pyproject.toml, without updating)..."
 # Ensures consistency based on pyproject.toml, doesn't fetch newer versions unless necessary
 # Use --no-update to strictly use versions specified in pyproject.toml or already in poetry.lock
-poetry lock --no-update
+poetry lock
 
 echo "Installing dependencies from lock file (production only)..."
 # --no-dev: Skips development dependencies like pytest
