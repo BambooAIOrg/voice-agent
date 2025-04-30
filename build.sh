@@ -30,6 +30,6 @@ poetry lock
 echo "Installing dependencies from lock file (production only)..."
 # --no-dev: Skips development dependencies like pytest
 # --sync: Ensures the environment exactly matches the lock file, removing unused packages if any were previously installed
-poetry install
+poetry install --no-root --sync
 
 exit 0 
