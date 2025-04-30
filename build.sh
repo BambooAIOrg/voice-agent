@@ -22,14 +22,22 @@ echo "Configuring Poetry to create virtual environment inside the project..."
 # This keeps the venv with the project code for easier packaging
 poetry config virtualenvs.in-project true
 
+echo "Ensuring virtualenv is installed..."
+command -v virtualenv >/dev/null 2>&1 || { echo "Installing virtualenv..."; python3 -m pip install virtualenv; } || { echo "Failed to install virtualenv"; exit 1; }
+
+echo "Creating virtual environment with copied interpreter..."
+# 使用 virtualenv 创建 .venv，并强制复制解释器
+# --python=python3 指定使用哪个 python 版本创建环境
+virtualenv --copies --python=python3 .venv || { echo "Failed to create virtualenv with copies"; exit 1; }
+
 echo "Locking dependencies (based on pyproject.toml, without updating)..."
 # Ensures consistency based on pyproject.toml, doesn't fetch newer versions unless necessary
 # Use --no-update to strictly use versions specified in pyproject.toml or already in poetry.lock
 poetry lock
 
-echo "Installing dependencies from lock file (production only)..."
-# --no-dev: Skips development dependencies like pytest
-# --sync: Ensures the environment exactly matches the lock file, removing unused packages if any were previously installed
+echo "Installing dependencies into existing venv using Poetry..."
+# --no-root: Skip installing the project itself as editable
+# --sync: Ensure the environment matches the lock file
 poetry install --no-root --sync
 
 exit 0 
