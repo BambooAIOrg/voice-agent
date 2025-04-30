@@ -49,8 +49,8 @@ After=network.target
 [Service]
 User=$SERVICE_USER
 WorkingDirectory=$DEPLOY_DIR
-# Execute the main.py script using poetry run
-ExecStart=/root/.local/bin/poetry run python3 $DEPLOY_DIR/main.py start
+# Execute the main.py script directly using the virtualenv's python
+ExecStart=$DEPLOY_DIR/.venv/bin/python $DEPLOY_DIR/main.py start
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1 # Ensures logs are sent immediately
