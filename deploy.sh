@@ -60,11 +60,13 @@ Environment=LIVEKIT_URL=${LIVEKIT_URL}
 Environment=LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
 Environment=LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
 Environment=OPENAI_API_KEY=${OPENAI_API_KEY}
-Environment=ALIYUN_APPKEY=${ALIYUN_APPKEY} # Example for AliSTT
-Environment=ALIYUN_ACCESS_KEY_ID=${ALIYUN_ACCESS_KEY_ID} # Example for AliSTT
-Environment=ALIYUN_ACCESS_KEY_SECRET=${ALIYUN_ACCESS_KEY_SECRET} # Example for AliSTT
-Environment=MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID} # Example for MinimaxTTS
-Environment=MINIMAX_API_KEY=${MINIMAX_API_KEY} # Example for MinimaxTTS
+Environment=ALIYUN_APPKEY=${ALIYUN_APPKEY}
+Environment=ALIYUN_ACCESS_KEY_ID=${ALIYUN_ACCESS_KEY_ID}
+Environment=ALIYUN_ACCESS_KEY_SECRET=${ALIYUN_ACCESS_KEY_SECRET}
+Environment=MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
+Environment=MINIMAX_API_KEY=${MINIMAX_API_KEY}
+Environment=ALIYUN_COMMON_ID=${ALIYUN_COMMON_ID}
+Environment=ALIYUN_COMMON_SECRET=${ALIYUN_COMMON_SECRET}
 # Add any other environment variables your application needs
 
 StandardOutput=journal+console
