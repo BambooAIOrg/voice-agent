@@ -1,0 +1,107 @@
+name: Deploy to Aliyun SAE
+
+on:
+  push:
+    branches: [ master, main ]  # 当推送到master或main分支时触发
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/vocab-agent:${{ github.sha }},ghcr.io/${{ github.repository_owner }}/vocab-agent:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    # 为SAE创建访问镜像的令牌
+    - name: Create GitHub PAT for SAE
+      id: create_token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.GH_APP_ID }}
+        private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+        owner: ${{ github.repository_owner }}
+        repositories: ${{ github.event.repository.name }}
+    
+    - name: Install Aliyun CLI
+      run: |
+        curl -o aliyun-cli-linux-latest-amd64.tgz https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-amd64.tgz
+        tar -xvzf aliyun-cli-linux-latest-amd64.tgz
+        sudo mv aliyun /usr/local/bin/
+        
+    - name: Configure Aliyun CLI
+      run: |
+        aliyun configure set --profile default --mode AK --region ap-southeast-1 --access-key-id ${{ secrets.ALIYUN_ACCESS_KEY_ID }} --access-key-secret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
+    
+    - name: Deploy to SAE
+      run: |
+        # 获取应用ID
+        APP_ID=${{ secrets.ALIYUN_SAE_APP_ID }}
+        
+        # 创建容器镜像仓库访问凭证的Secret
+        SECRET_NAME="github-container-registry-auth"
+        echo "Creating or updating registry auth secret..."
+        
+        # 检查并创建/更新Secret
+        aliyun sae ListNamespacedSecrets --RegionId ap-southeast-1 --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} | grep -q "$SECRET_NAME" && \
+        (
+          echo "Updating existing secret..."
+          aliyun sae UpdateSecret \
+            --RegionId ap-southeast-1 \
+            --SecretId $SECRET_NAME \
+            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
+        ) || \
+        (
+          echo "Creating new secret..."
+          aliyun sae CreateSecret \
+            --RegionId ap-southeast-1 \
+            --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} \
+            --SecretName $SECRET_NAME \
+            --SecretType ImageSecret \
+            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
+        )
+        
+        # 使用阿里云CLI部署应用并应用Secret
+        echo "Updating SAE application..."
+        aliyun sae UpdateApplicationConfig \
+          --RegionId ap-southeast-1 \
+          --AppId $APP_ID \
+          --PackageType Image \
+          --PackageVersion latest \
+          --PackageUrl ghcr.io/${{ github.repository_owner }}/vocab-agent:${{ github.sha }} \
+          --ImagePullSecret $SECRET_NAME \
+          --Envs \
+            '[{"name":"LIVEKIT_URL","value":"${{ secrets.LIVEKIT_URL }}"},' \
+            '{"name":"LIVEKIT_API_KEY","value":"${{ secrets.LIVEKIT_API_KEY }}"},' \
+            '{"name":"LIVEKIT_API_SECRET","value":"${{ secrets.LIVEKIT_API_SECRET }}"},' \
+            '{"name":"OPENAI_API_KEY","value":"${{ secrets.OPENAI_API_KEY }}"},' \
+            '{"name":"ALIYUN_APPKEY","value":"${{ secrets.ALIYUN_APPKEY }}"},' \
+            '{"name":"ALIYUN_ACCESS_KEY_ID","value":"${{ secrets.ALIYUN_ACCESS_KEY_ID }}"},' \
+            '{"name":"ALIYUN_ACCESS_KEY_SECRET","value":"${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}"},' \
+            '{"name":"MINIMAX_GROUP_ID","value":"${{ secrets.MINIMAX_GROUP_ID }}"},' \
+            '{"name":"MINIMAX_API_KEY","value":"${{ secrets.MINIMAX_API_KEY }}"},' \
+            '{"name":"ALIYUN_COMMON_ID","value":"${{ secrets.ALIYUN_COMMON_ID }}"},' \
+            '{"name":"ALIYUN_COMMON_SECRET","value":"${{ secrets.ALIYUN_COMMON_SECRET }}"},' \
+            '{"name":"ENV","value":"production"}]' 

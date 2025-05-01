@@ -6,7 +6,7 @@ authors = ["User"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.12"
 livekit = ">=1.0.3"
 livekit-agents = "1.0.11"
 livekit-plugins-openai = "1.0.11"
