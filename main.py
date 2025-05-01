@@ -280,11 +280,14 @@ async def entrypoint(ctx: JobContext):
 
 
 async def request_fnc(request: JobRequest):
-    logger.info(request.room.metadata)
+    logger.info(f"Received request: {request.room.metadata}")
+    logger.info(f"ENV: {os.getenv('ENV')}")
     metadata = json.loads(request.room.metadata)
     if metadata.get("env") == os.getenv("ENV"):
+        logger.info(f"Accepting request: {metadata}")
         await request.accept(attributes=metadata)
     else:
+        logger.info(f"Rejecting request: {metadata}")
         await request.reject()
 
 if __name__ == "__main__":
