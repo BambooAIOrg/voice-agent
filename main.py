@@ -289,10 +289,3 @@ async def request_fnc(request: JobRequest):
     else:
         logger.info(f"Rejecting request: {metadata}")
         await request.reject()
-
-if __name__ == "__main__":
-    cli.run_app(WorkerOptions(
-        entrypoint_fnc=entrypoint,
-        prewarm_fnc=prewarm,
-        request_fnc=request_fnc
-    ))
