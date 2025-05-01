@@ -76,7 +76,7 @@ jobs:
           aliyun sae UpdateSecret \
             --RegionId ap-southeast-1 \
             --SecretId $SECRET_NAME \
-            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
+            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.setup_pat.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.setup_pat.outputs.token }}" | base64)\"}}}"
         ) || \
         (
           echo "Creating new secret..."
@@ -85,7 +85,7 @@ jobs:
             --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} \
             --SecretName $SECRET_NAME \
             --SecretType ImageSecret \
-            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
+            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.setup_pat.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.setup_pat.outputs.token }}" | base64)\"}}}"
         )
         
         # 使用阿里云CLI部署应用并应用Secret
