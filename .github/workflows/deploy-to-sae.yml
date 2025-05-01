@@ -107,6 +107,4 @@ jobs:
             '{"name":"ALIYUN_ACCESS_KEY_SECRET","value":"${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}"},' \
             '{"name":"MINIMAX_GROUP_ID","value":"${{ secrets.MINIMAX_GROUP_ID }}"},' \
             '{"name":"MINIMAX_API_KEY","value":"${{ secrets.MINIMAX_API_KEY }}"},' \
-            '{"name":"ALIYUN_COMMON_ID","value":"${{ secrets.ALIYUN_COMMON_ID }}"},' \
-            '{"name":"ALIYUN_COMMON_SECRET","value":"${{ secrets.ALIYUN_COMMON_SECRET }}"},' \
             '{"name":"ENV","value":"production"}]' 

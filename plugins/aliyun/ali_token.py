@@ -8,11 +8,10 @@ from livekit.agents.log import logger
 
 # logger = get_logger(__name__) # Removed local logger usage
 
-
 class AliToken:
     def __init__(self):
-        self.access_key_id = os.getenv('ALIYUN_COMMON_ID')
-        self.access_key_secret = os.getenv('ALIYUN_COMMON_SECRET')
+        self.access_key_id = os.getenv('ALIYUN_ACCESS_KEY_ID')
+        self.access_key_secret = os.getenv('ALIYUN_ACCESS_KEY_SECRET')
         self.client = AcsClient(
             self.access_key_id,
             self.access_key_secret,

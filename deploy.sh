@@ -65,8 +65,6 @@ Environment=ALIYUN_ACCESS_KEY_ID=${ALIYUN_ACCESS_KEY_ID}
 Environment=ALIYUN_ACCESS_KEY_SECRET=${ALIYUN_ACCESS_KEY_SECRET}
 Environment=MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
 Environment=MINIMAX_API_KEY=${MINIMAX_API_KEY}
-Environment=ALIYUN_COMMON_ID=${ALIYUN_COMMON_ID}
-Environment=ALIYUN_COMMON_SECRET=${ALIYUN_COMMON_SECRET}
 Environment=ENV=${ENV}
 # Add any other environment variables your application needs
 
