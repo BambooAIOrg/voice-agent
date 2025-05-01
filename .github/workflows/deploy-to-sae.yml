@@ -70,27 +70,27 @@ jobs:
         echo "Creating or updating registry auth secret..."
         
         # 检查并创建/更新Secret
-        aliyun sae ListNamespacedSecrets --RegionId ap-southeast-1 --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} | grep -q "$SECRET_NAME" && \
+        aliyun sae GET /pop/v1/sam/namespace/listNamespacedSecrets --RegionId ap-southeast-1 --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} | grep -q "$SECRET_NAME" && \
         (
           echo "Updating existing secret..."
-          aliyun sae UpdateSecret \
+          aliyun sae PUT /pop/v1/sam/secret/updateSecret \
             --RegionId ap-southeast-1 \
             --SecretId $SECRET_NAME \
-            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.setup_pat.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.setup_pat.outputs.token }}" | base64)\"}}}"
+            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
         ) || \
         (
           echo "Creating new secret..."
-          aliyun sae CreateSecret \
+          aliyun sae POST /pop/v1/sam/secret/createSecret \
             --RegionId ap-southeast-1 \
             --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} \
             --SecretName $SECRET_NAME \
             --SecretType ImageSecret \
-            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.setup_pat.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.setup_pat.outputs.token }}" | base64)\"}}}"
+            --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
         )
         
         # 使用阿里云CLI部署应用并应用Secret
         echo "Updating SAE application..."
-        aliyun sae UpdateApplicationConfig \
+        aliyun sae PUT /pop/v1/sam/app/updateAppConfig \
           --RegionId ap-southeast-1 \
           --AppId $APP_ID \
           --PackageType Image \
