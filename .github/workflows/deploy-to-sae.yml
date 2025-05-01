@@ -77,7 +77,7 @@ jobs:
         AUTH_STRING=$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)
         DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$AUTH_STRING\"}}}"
         DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64)
-        SECRET_DATA="{\"SecretData\":\"{\\\".dockerconfigjson\\\":\\\"$DOCKER_CONFIG_BASE64\\\"}\"}"
+        SECRET_DATA="{\"SecretData\":{\".dockerconfigjson\":\"$DOCKER_CONFIG_BASE64\"}}"
         
         # 检查Secret是否存在
         SECRET_EXISTS=$(aliyun sae --endpoint $ENDPOINT --region $REGION GET /pop/v1/sam/secret/secrets | grep -c "$SECRET_NAME" || true)
@@ -86,6 +86,7 @@ jobs:
           echo "Updating existing secret..."
           aliyun sae --endpoint $ENDPOINT --region $REGION PUT /pop/v1/sam/secret/secret \
             --SecretId $SECRET_NAME \
+            --NamespaceId "${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}" \
             --SecretData "$SECRET_DATA" \
             --header "Content-Type=application/json;" \
             --body "{}"
