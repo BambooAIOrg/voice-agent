@@ -84,7 +84,7 @@ jobs:
             --RegionId ap-southeast-1 \
             --NamespaceId ${{ secrets.ALIYUN_SAE_NAMESPACE_ID }} \
             --SecretName $SECRET_NAME \
-            --SecretType ImageSecret \
+            --SecretType kubernetes.io/dockerconfigjson \
             --Data "{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
         )
         
