@@ -1,5 +1,7 @@
+import json
 import logging
 from dataclasses import dataclass, field
+import os
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -18,12 +20,12 @@ from livekit.agents import (
     cli,
     metrics,
 )
-from livekit.agents.job import get_job_context
+from livekit.agents.job import JobRequest
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
 from livekit.plugins import openai, silero
 from livekit.plugins import noise_cancellation
-from plugins.aliyun.stt import AliSTT
+# from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 
 logger = logging.getLogger("multi-agent-word-learning")
@@ -242,7 +244,7 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession[WordLearningData](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1"),
-        stt=AliSTT(),
+        stt=openai.STT(model="gpt-4o-transcribe"),
         tts=MinimaxTTS(
             model="speech-02-hd",
             voice_id="Cantonese_CuteGirl",
@@ -277,5 +279,17 @@ async def entrypoint(ctx: JobContext):
     )
 
 
+async def request_fnc(request: JobRequest):
+    logger.info(request.room.metadata)
+    metadata = json.loads(request.room.metadata)
+    if metadata.get("env") == os.getenv("ENV"):
+        await request.accept(attributes=metadata)
+    else:
+        await request.reject()
+
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))
+    cli.run_app(WorkerOptions(
+        entrypoint_fnc=entrypoint,
+        prewarm_fnc=prewarm,
+        request_fnc=request_fnc
+    ))
