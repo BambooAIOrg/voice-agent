@@ -66,55 +66,55 @@ jobs:
         APP_ID=${{ secrets.ALIYUN_SAE_APP_ID }}
         
         # 设置认证信息和区域
-        export ALIBABA_CLOUD_ACCESS_KEY_ID=${{ secrets.ALIYUN_ACCESS_KEY_ID }}
-        export ALIBABA_CLOUD_ACCESS_KEY_SECRET=${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}
         REGION="ap-southeast-1"
         ENDPOINT="sae.${REGION}.aliyuncs.com"
         
-        # 使用curl而不是aliyun cli
+        # 创建容器镜像仓库访问凭证的Secret
         echo "Creating secret for container registry..."
-        AUTH_JSON="{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)\"}}}"
+        SECRET_NAME="github-container-registry-auth"
         
-        # 使用aliyun直接发送请求，不使用子命令
-        aliyun --region $REGION \
-          --endpoint $ENDPOINT \
-          --access-key-id ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
-          --access-key-secret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
-          --product sae \
-          POST /pop/v1/sam/secret/secret \
-          --secure \
-          --body "{
-            \"NamespaceId\": \"${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}\",
-            \"SecretName\": \"github-container-registry-auth\",
-            \"SecretType\": \"kubernetes.io/dockerconfigjson\",
-            \"SecretData\": \"${AUTH_JSON}\"
-          }"
+        # 准备Docker配置JSON - 按照文档格式正确创建
+        AUTH_STRING=$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)
+        DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$AUTH_STRING\"}}}"
+        DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64)
+        SECRET_DATA="{\"SecretData\":\"{\\\".dockerconfigjson\\\":\\\"$DOCKER_CONFIG_BASE64\\\"}\"}"
+        
+        # 检查Secret是否存在
+        SECRET_EXISTS=$(aliyun sae --endpoint $ENDPOINT --region $REGION GET /pop/v1/sam/secret/secrets | grep -c "$SECRET_NAME" || true)
+        
+        if [ "$SECRET_EXISTS" -gt "0" ]; then
+          echo "Updating existing secret..."
+          aliyun sae --endpoint $ENDPOINT --region $REGION PUT /pop/v1/sam/secret/secret \
+            --SecretId $SECRET_NAME \
+            --SecretData "$SECRET_DATA" \
+            --header "Content-Type=application/json;" \
+            --body "{}"
+        else
+          echo "Creating new secret..."
+          aliyun sae --endpoint $ENDPOINT --region $REGION POST /pop/v1/sam/secret/secret \
+            --NamespaceId "${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}" \
+            --SecretName "$SECRET_NAME" \
+            --SecretType "kubernetes.io/dockerconfigjson" \
+            --SecretData "$SECRET_DATA" \
+            --header "Content-Type=application/json;" \
+            --body "{}"
+        fi
         
         # 更新SAE应用配置
         echo "Updating SAE application..."
-        aliyun --region $REGION \
-          --endpoint $ENDPOINT \
-          --access-key-id ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
-          --access-key-secret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
-          --product sae \
-          PUT /pop/v1/sam/app/updateAppConfig \
-          --secure \
-          --body "{
-            \"AppId\": \"${APP_ID}\",
-            \"PackageType\": \"Image\",
-            \"PackageVersion\": \"latest\",
-            \"PackageUrl\": \"ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:${{ github.sha }}\",
-            \"ImagePullSecret\": \"github-container-registry-auth\",
-            \"Envs\": [
-              {\"name\":\"LIVEKIT_URL\",\"value\":\"${{ secrets.LIVEKIT_URL }}\"},
-              {\"name\":\"LIVEKIT_API_KEY\",\"value\":\"${{ secrets.LIVEKIT_API_KEY }}\"},
-              {\"name\":\"LIVEKIT_API_SECRET\",\"value\":\"${{ secrets.LIVEKIT_API_SECRET }}\"},
-              {\"name\":\"OPENAI_API_KEY\",\"value\":\"${{ secrets.OPENAI_API_KEY }}\"},
-              {\"name\":\"ALIYUN_APPKEY\",\"value\":\"${{ secrets.ALIYUN_APPKEY }}\"},
-              {\"name\":\"ALIYUN_ACCESS_KEY_ID\",\"value\":\"${{ secrets.ALIYUN_ACCESS_KEY_ID }}\"},
-              {\"name\":\"ALIYUN_ACCESS_KEY_SECRET\",\"value\":\"${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}\"},
-              {\"name\":\"MINIMAX_GROUP_ID\",\"value\":\"${{ secrets.MINIMAX_GROUP_ID }}\"},
-              {\"name\":\"MINIMAX_API_KEY\",\"value\":\"${{ secrets.MINIMAX_API_KEY }}\"},
-              {\"name\":\"ENV\",\"value\":\"production\"}
-            ]
-          }" 
+        aliyun sae --endpoint $ENDPOINT --region $REGION PUT /pop/v1/sam/app/updateAppConfig \
+          --AppId "$APP_ID" \
+          --PackageType "Image" \
+          --PackageVersion "latest" \
+          --PackageUrl "ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:${{ github.sha }}" \
+          --ImagePullSecret "$SECRET_NAME" \
+          --Envs "[{\"name\":\"LIVEKIT_URL\",\"value\":\"${{ secrets.LIVEKIT_URL }}\"},
+                 {\"name\":\"LIVEKIT_API_KEY\",\"value\":\"${{ secrets.LIVEKIT_API_KEY }}\"},
+                 {\"name\":\"LIVEKIT_API_SECRET\",\"value\":\"${{ secrets.LIVEKIT_API_SECRET }}\"},
+                 {\"name\":\"OPENAI_API_KEY\",\"value\":\"${{ secrets.OPENAI_API_KEY }}\"},
+                 {\"name\":\"ALIYUN_APPKEY\",\"value\":\"${{ secrets.ALIYUN_APPKEY }}\"},
+                 {\"name\":\"ALIYUN_ACCESS_KEY_ID\",\"value\":\"${{ secrets.ALIYUN_ACCESS_KEY_ID }}\"},
+                 {\"name\":\"ALIYUN_ACCESS_KEY_SECRET\",\"value\":\"${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}\"},
+                 {\"name\":\"MINIMAX_GROUP_ID\",\"value\":\"${{ secrets.MINIMAX_GROUP_ID }}\"},
+                 {\"name\":\"MINIMAX_API_KEY\",\"value\":\"${{ secrets.MINIMAX_API_KEY }}\"},
+                 {\"name\":\"ENV\",\"value\":\"production\"}]" 
