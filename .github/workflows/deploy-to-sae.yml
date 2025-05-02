@@ -83,8 +83,10 @@ jobs:
         
         # 检查Secret是否存在
         SECRET_EXISTS=$(aliyun sae GET /pop/v1/sam/secret/secrets --region $REGION | grep -c "$SECRET_NAME" || true)
-        NAMESPACE_ID="${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}"
+        NAMESPACE_ID="ap-southeast-1"
         echo "ALIYUN_SAE_NAMESPACE_ID: ${NAMESPACE_ID}"
+        echo "ALIYUN_SAE_APP_ID: ${APP_ID}"
+        echo "SECRET_EXISTS: ${SECRET_EXISTS}"
         
         if [ "$SECRET_EXISTS" -gt "0" ]; then
           echo "Updating existing secret..."
@@ -98,7 +100,7 @@ jobs:
           echo "Creating new secret..."
           aliyun sae POST /pop/v1/sam/secret/secret \
             --region $REGION \
-            --NamespaceId "${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}" \
+            --NamespaceId "$NAMESPACE_ID" \
             --SecretName "$SECRET_NAME" \
             --SecretType "kubernetes.io/dockerconfigjson" \
             --SecretData "$SECRET_DATA" \
