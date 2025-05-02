@@ -82,8 +82,8 @@ jobs:
         echo "Creating secret for container registry..."
         SECRET_NAME="github-container-registry-auth"
         
-        # 创建正确格式的SecretData
-        SECRET_DATA="{\"SecretData\":\"{\\\".dockerconfigjson\\\":\\\"$DOCKER_CONFIG_BASE64\\\"}\"}"
+        # 创建正确格式的SecretData - 修复为符合 SAE 要求的格式
+        SECRET_DATA="{\".dockerconfigjson\":\"$DOCKER_CONFIG\"}"
         
         NAMESPACE_ID="${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}"
         # 检查Secret是否存在
