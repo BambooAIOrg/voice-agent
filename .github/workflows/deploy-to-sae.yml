@@ -90,16 +90,35 @@ jobs:
           echo "Getting numeric SecretId for the secret..."
           # 获取secret的详细信息，包括其数字ID
           SECRET_DETAILS=$(aliyun sae GET /pop/v1/sam/secret/secrets --NamespaceId "$NAMESPACE_ID" --region $REGION)
-          # 从返回的JSON中提取SecretId（数字ID）
-          NUMERIC_SECRET_ID=$(echo "$SECRET_DETAILS" | grep -o '"SecretId":[0-9]*' | grep -o '[0-9]*' | head -1)
+          echo "Secret details: $SECRET_DETAILS"
           
-          echo "Updating existing secret with ID: ${NUMERIC_SECRET_ID}..."
-          aliyun sae PUT /pop/v1/sam/secret/secret \
-            --region $REGION \
-            --SecretId "$NUMERIC_SECRET_ID" \
-            --NamespaceId "$NAMESPACE_ID" \
-            --SecretData "$SECRET_DATA" \
-            --header "Content-Type=application/json;"
+          # 完善提取SecretId的方法，使用jq工具
+          # 先安装jq工具
+          sudo apt-get update && sudo apt-get install -y jq
+          
+          # 使用jq精确提取与SECRET_NAME匹配的密钥的SecretId
+          NUMERIC_SECRET_ID=$(echo "$SECRET_DETAILS" | jq -r --arg name "$SECRET_NAME" '.Data.SecretList[] | select(.SecretName==$name) | .SecretId')
+          
+          echo "Found SecretId: ${NUMERIC_SECRET_ID}"
+          
+          if [ -z "$NUMERIC_SECRET_ID" ]; then
+            echo "ERROR: Could not find SecretId for $SECRET_NAME. Creating new secret instead."
+            aliyun sae POST /pop/v1/sam/secret/secret \
+              --region $REGION \
+              --NamespaceId "$NAMESPACE_ID" \
+              --SecretName "$SECRET_NAME" \
+              --SecretType "kubernetes.io/dockerconfigjson" \
+              --SecretData "$SECRET_DATA" \
+              --header "Content-Type=application/json;"
+          else
+            echo "Updating existing secret with ID: ${NUMERIC_SECRET_ID}..."
+            aliyun sae PUT /pop/v1/sam/secret/secret \
+              --region $REGION \
+              --SecretId "$NUMERIC_SECRET_ID" \
+              --NamespaceId "$NAMESPACE_ID" \
+              --SecretData "$SECRET_DATA" \
+              --header "Content-Type=application/json;"
+          fi
         else
           echo "Creating new secret..."
           aliyun sae POST /pop/v1/sam/secret/secret \
