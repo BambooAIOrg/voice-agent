@@ -96,8 +96,8 @@ jobs:
           # 先安装jq工具
           sudo apt-get update && sudo apt-get install -y jq
           
-          # 使用jq精确提取与SECRET_NAME匹配的密钥的SecretId
-          NUMERIC_SECRET_ID=$(echo "$SECRET_DETAILS" | jq -r --arg name "$SECRET_NAME" '.Data.SecretList[] | select(.SecretName==$name) | .SecretId')
+          # 使用jq精确提取与SECRET_NAME匹配的密钥的SecretId - 修正JSON路径
+          NUMERIC_SECRET_ID=$(echo "$SECRET_DETAILS" | jq -r --arg name "$SECRET_NAME" '.Data.Secrets[] | select(.SecretName==$name) | .SecretId')
           
           echo "Found SecretId: ${NUMERIC_SECRET_ID}"
           
@@ -149,4 +149,4 @@ jobs:
                  {\"name\":\"MINIMAX_GROUP_ID\",\"value\":\"${{ secrets.MINIMAX_GROUP_ID }}\"},
                  {\"name\":\"MINIMAX_API_KEY\",\"value\":\"${{ secrets.MINIMAX_API_KEY }}\"},
                  {\"name\":\"ENV\",\"value\":\"production\"}]" \
-          --header "Content-Type=application/json;" 
+          --header "Content-Type=application/json;"
