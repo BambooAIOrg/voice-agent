@@ -81,15 +81,11 @@ jobs:
         # 创建正确格式的SecretData
         SECRET_DATA="{\"SecretData\":\"{\\\".dockerconfigjson\\\":\\\"$DOCKER_CONFIG_BASE64\\\"}\"}"
         
-        NAMESPACE_ID="ap-southeast-1"
-        echo "ALIYUN_SAE_NAMESPACE_ID: ${NAMESPACE_ID}"
-        echo "ALIYUN_SAE_APP_ID: ${APP_ID}"
-        echo "SECRET_EXISTS: ${SECRET_EXISTS}"
-        
+        NAMESPACE_ID="${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}"
         # 检查Secret是否存在
         SECRET_EXISTS=$(aliyun sae GET /pop/v1/sam/secret/secrets --NamespaceId "$NAMESPACE_ID" --region $REGION | grep -c "$SECRET_NAME" || true)
         
-
+        echo "SECRET_EXISTS: ${SECRET_EXISTS}"
         if [ "$SECRET_EXISTS" -gt "0" ]; then
           echo "Updating existing secret..."
           aliyun sae PUT /pop/v1/sam/secret/secret \
