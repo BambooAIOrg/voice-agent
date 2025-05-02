@@ -87,10 +87,16 @@ jobs:
         
         echo "SECRET_EXISTS: ${SECRET_EXISTS}"
         if [ "$SECRET_EXISTS" -gt "0" ]; then
-          echo "Updating existing secret..."
+          echo "Getting numeric SecretId for the secret..."
+          # 获取secret的详细信息，包括其数字ID
+          SECRET_DETAILS=$(aliyun sae GET /pop/v1/sam/secret/secrets --NamespaceId "$NAMESPACE_ID" --region $REGION)
+          # 从返回的JSON中提取SecretId（数字ID）
+          NUMERIC_SECRET_ID=$(echo "$SECRET_DETAILS" | grep -o '"SecretId":[0-9]*' | grep -o '[0-9]*' | head -1)
+          
+          echo "Updating existing secret with ID: ${NUMERIC_SECRET_ID}..."
           aliyun sae PUT /pop/v1/sam/secret/secret \
             --region $REGION \
-            --SecretId "$SECRET_NAME" \
+            --SecretId "$NUMERIC_SECRET_ID" \
             --NamespaceId "$NAMESPACE_ID" \
             --SecretData "$SECRET_DATA" \
             --header "Content-Type=application/json;"
