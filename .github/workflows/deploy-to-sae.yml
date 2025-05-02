@@ -19,36 +19,21 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
-    - name: Login to GitHub Container Registry
+    - name: Login to Aliyun Container Registry
       uses: docker/login-action@v3
       with:
-        registry: ghcr.io
-        username: ${{ github.repository_owner }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Convert repository owner to lowercase
-      id: repo_owner_lowercase
-      run: |
-        echo "value=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+        registry: crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com
+        username: aliyun8628604033
+        password: ${{ secrets.ALIYUN_CR_PASSWORD }}
         
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         push: true
-        tags: ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:${{ github.sha }},ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:latest
+        tags: crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com/bambooai/vocab-agent:${{ github.sha }},crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com/bambooai/vocab-agent:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
-    
-    # 为SAE创建访问镜像的令牌
-    - name: Create GitHub PAT for SAE
-      id: create_token
-      uses: actions/create-github-app-token@v1
-      with:
-        app-id: ${{ secrets.GH_APP_ID }}
-        private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-        owner: ${{ github.repository_owner }}
-        repositories: ${{ github.event.repository.name }}
     
     - name: Install Aliyun CLI
       run: |
@@ -69,18 +54,14 @@ jobs:
         REGION="ap-southeast-1"
         ENDPOINT="sae.${REGION}.aliyuncs.com"
         
-        AUTH_TOKEN=${{ steps.create_token.outputs.token }}
-        echo "AUTH_TOKEN: $AUTH_TOKEN"
-        # 准备Docker配置JSON - 按照文档格式正确创建
-        AUTH_STRING=$(echo -n "${{ steps.repo_owner_lowercase.outputs.value }}:$AUTH_TOKEN" | base64 -w 0)
-        DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"username\":\"${{ steps.repo_owner_lowercase.outputs.value }}\",\"password\":\"$AUTH_TOKEN\",\"auth\":\"$AUTH_STRING\"}}}"
-        DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64 -w 0)
-        
-        echo "DOCKER_CONFIG_BASE64: $DOCKER_CONFIG_BASE64"
-        echo "DOCKER_CONFIG: $DOCKER_CONFIG"
         # 创建容器镜像仓库访问凭证的Secret
         echo "Creating secret for container registry..."
-        SECRET_NAME="github-container-registry-auth"
+        SECRET_NAME="aliyun-container-registry-auth"
+        
+        # 准备Docker配置JSON
+        AUTH_STRING=$(echo -n "aliyun8628604033:${{ secrets.ALIYUN_CR_PASSWORD }}" | base64 -w 0)
+        DOCKER_CONFIG="{\"auths\":{\"crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com\":{\"username\":\"aliyun8628604033\",\"password\":\"${{ secrets.ALIYUN_CR_PASSWORD }}\",\"auth\":\"$AUTH_STRING\"}}}"
+        DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64 -w 0)
         
         # 创建正确格式的SecretData
         SECRET_DATA="{\"SecretData\":\"{\\\".dockerconfigjson\\\":\\\"$DOCKER_CONFIG_BASE64\\\"}\"}"
@@ -94,13 +75,12 @@ jobs:
           echo "Getting numeric SecretId for the secret..."
           # 获取secret的详细信息，包括其数字ID
           SECRET_DETAILS=$(aliyun sae GET /pop/v1/sam/secret/secrets --NamespaceId "$NAMESPACE_ID" --region $REGION)
-          echo "Secret details: $SECRET_DETAILS"
           
           # 完善提取SecretId的方法，使用jq工具
           # 先安装jq工具
           sudo apt-get update && sudo apt-get install -y jq
           
-          # 使用jq精确提取与SECRET_NAME匹配的密钥的SecretId - 修正JSON路径
+          # 使用jq精确提取与SECRET_NAME匹配的密钥的SecretId
           NUMERIC_SECRET_ID=$(echo "$SECRET_DETAILS" | jq -r --arg name "$SECRET_NAME" '.Data.Secrets[] | select(.SecretName==$name) | .SecretId')
           
           echo "Found SecretId: ${NUMERIC_SECRET_ID}"
@@ -141,7 +121,7 @@ jobs:
           --AppId "$APP_ID" \
           --PackageType "Image" \
           --PackageVersion "latest" \
-          --ImageUrl "ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:${{ github.sha }}" \
+          --ImageUrl "crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com/bambooai/vocab-agent:${{ github.sha }}" \
           --ImagePullSecret "$SECRET_NAME" \
           --Envs "[{\"name\":\"LIVEKIT_URL\",\"value\":\"${{ secrets.LIVEKIT_URL }}\"},
                  {\"name\":\"LIVEKIT_API_KEY\",\"value\":\"${{ secrets.LIVEKIT_API_KEY }}\"},
