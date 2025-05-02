@@ -83,14 +83,15 @@ jobs:
         
         # 检查Secret是否存在
         SECRET_EXISTS=$(aliyun sae GET /pop/v1/sam/secret/secrets --region $REGION | grep -c "$SECRET_NAME" || true)
+        NAMESPACE_ID="${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}"
+        echo "ALIYUN_SAE_NAMESPACE_ID: ${NAMESPACE_ID}"
         
-        echo "ALIYUN_SAE_NAMESPACE_ID: ${ALIYUN_SAE_NAMESPACE_ID}"
         if [ "$SECRET_EXISTS" -gt "0" ]; then
           echo "Updating existing secret..."
           aliyun sae PUT /pop/v1/sam/secret/secret \
             --region $REGION \
             --SecretId "$SECRET_NAME" \
-            --NamespaceId "${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}" \
+            --NamespaceId "$NAMESPACE_ID" \
             --SecretData "$SECRET_DATA" \
             --header "Content-Type=application/json;"
         else
