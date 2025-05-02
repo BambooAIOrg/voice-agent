@@ -137,7 +137,7 @@ jobs:
           --AppId "$APP_ID" \
           --PackageType "Image" \
           --PackageVersion "latest" \
-          --PackageUrl "ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:${{ github.sha }}" \
+          --ImageUrl "ghcr.io/${{ steps.repo_owner_lowercase.outputs.value }}/vocab-agent:${{ github.sha }}" \
           --ImagePullSecret "$SECRET_NAME" \
           --Envs "[{\"name\":\"LIVEKIT_URL\",\"value\":\"${{ secrets.LIVEKIT_URL }}\"},
                  {\"name\":\"LIVEKIT_API_KEY\",\"value\":\"${{ secrets.LIVEKIT_API_KEY }}\"},
