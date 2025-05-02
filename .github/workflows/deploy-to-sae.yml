@@ -69,41 +69,44 @@ jobs:
         REGION="ap-southeast-1"
         ENDPOINT="sae.${REGION}.aliyuncs.com"
         
+        # 准备Docker配置JSON - 按照文档格式正确创建
+        AUTH_STRING=$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64 | tr -d '\n')
+        DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$AUTH_STRING\"}}}"
+        DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64 | tr -d '\n')
+        
         # 创建容器镜像仓库访问凭证的Secret
         echo "Creating secret for container registry..."
         SECRET_NAME="github-container-registry-auth"
         
-        # 准备Docker配置JSON - 按照文档格式正确创建
-        AUTH_STRING=$(echo -n "${{ github.repository_owner }}:${{ steps.create_token.outputs.token }}" | base64)
-        DOCKER_CONFIG="{\"auths\":{\"ghcr.io\":{\"username\":\"${{ github.repository_owner }}\",\"password\":\"${{ steps.create_token.outputs.token }}\",\"auth\":\"$AUTH_STRING\"}}}"
-        DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64)
-        SECRET_DATA="{\"SecretData\":{\".dockerconfigjson\":\"$DOCKER_CONFIG_BASE64\"}}"
+        # 创建正确格式的SecretData
+        SECRET_DATA="{\"SecretData\":\"{\\\".dockerconfigjson\\\":\\\"$DOCKER_CONFIG_BASE64\\\"}\"}"
         
         # 检查Secret是否存在
-        SECRET_EXISTS=$(aliyun sae --endpoint $ENDPOINT --region $REGION GET /pop/v1/sam/secret/secrets | grep -c "$SECRET_NAME" || true)
+        SECRET_EXISTS=$(aliyun sae GET /pop/v1/sam/secret/secrets --region $REGION | grep -c "$SECRET_NAME" || true)
         
         if [ "$SECRET_EXISTS" -gt "0" ]; then
           echo "Updating existing secret..."
-          aliyun sae --endpoint $ENDPOINT --region $REGION PUT /pop/v1/sam/secret/secret \
-            --SecretId $SECRET_NAME \
+          aliyun sae PUT /pop/v1/sam/secret/secret \
+            --region $REGION \
+            --SecretId "$SECRET_NAME" \
             --NamespaceId "${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}" \
             --SecretData "$SECRET_DATA" \
-            --header "Content-Type=application/json;" \
-            --body "{}"
+            --header "Content-Type=application/json;"
         else
           echo "Creating new secret..."
-          aliyun sae --endpoint $ENDPOINT --region $REGION POST /pop/v1/sam/secret/secret \
+          aliyun sae POST /pop/v1/sam/secret/secret \
+            --region $REGION \
             --NamespaceId "${{ secrets.ALIYUN_SAE_NAMESPACE_ID }}" \
             --SecretName "$SECRET_NAME" \
             --SecretType "kubernetes.io/dockerconfigjson" \
             --SecretData "$SECRET_DATA" \
-            --header "Content-Type=application/json;" \
-            --body "{}"
+            --header "Content-Type=application/json;"
         fi
         
         # 更新SAE应用配置
-        echo "Updating SAE application..."
-        aliyun sae --endpoint $ENDPOINT --region $REGION PUT /pop/v1/sam/app/updateAppConfig \
+        echo "Deploying SAE application..."
+        aliyun sae POST /pop/v1/sam/app/deployApplication \
+          --region $REGION \
           --AppId "$APP_ID" \
           --PackageType "Image" \
           --PackageVersion "latest" \
@@ -118,4 +121,5 @@ jobs:
                  {\"name\":\"ALIYUN_ACCESS_KEY_SECRET\",\"value\":\"${{ secrets.ALIYUN_ACCESS_KEY_SECRET }}\"},
                  {\"name\":\"MINIMAX_GROUP_ID\",\"value\":\"${{ secrets.MINIMAX_GROUP_ID }}\"},
                  {\"name\":\"MINIMAX_API_KEY\",\"value\":\"${{ secrets.MINIMAX_API_KEY }}\"},
-                 {\"name\":\"ENV\",\"value\":\"production\"}]" 
+                 {\"name\":\"ENV\",\"value\":\"production\"}]" \
+          --header "Content-Type=application/json;" 
