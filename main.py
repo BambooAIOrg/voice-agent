@@ -308,7 +308,8 @@ def load_fnc(*args, window_size=6, interval=0.5):
         return 0.0
     
     load = sum(load_fnc.samples) / len(load_fnc.samples)
-    logger.info(f"load: {load}")
+    if load > 0.5:
+        logger.info(f"load: {load}")
     return load
 
 if __name__ == "__main__":
