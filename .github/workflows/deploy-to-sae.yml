@@ -60,7 +60,7 @@ jobs:
         
         # 准备Docker配置JSON
         AUTH_STRING=$(echo -n "aliyun8628604033:${{ secrets.ALIYUN_CR_PASSWORD }}" | base64 -w 0)
-        DOCKER_CONFIG="{\"auths\":{\"crpi-h63lvr41mcj56ogo-vpc.ap-southeast-1.personal.cr.aliyuncs.com\":{\"username\":\"aliyun8628604033\",\"password\":\"${{ secrets.ALIYUN_CR_PASSWORD }}\",\"auth\":\"$AUTH_STRING\"}}}"
+        DOCKER_CONFIG="{\"auths\":{\"crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com\":{\"username\":\"aliyun8628604033\",\"password\":\"${{ secrets.ALIYUN_CR_PASSWORD }}\",\"auth\":\"$AUTH_STRING\"}}}"
         DOCKER_CONFIG_BASE64=$(echo -n "$DOCKER_CONFIG" | base64 -w 0)
         
         # 创建正确格式的SecretData
@@ -121,7 +121,7 @@ jobs:
           --AppId "$APP_ID" \
           --PackageType "Image" \
           --PackageVersion "latest" \
-          --ImageUrl "crpi-h63lvr41mcj56ogo-vpc.ap-southeast-1.personal.cr.aliyuncs.com/bambooai/vocab-agent:${{ github.sha }}" \
+          --ImageUrl "crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com/bambooai/vocab-agent:${{ github.sha }}" \
           --ImagePullSecret "$SECRET_NAME" \
           --Envs "[{\"name\":\"LIVEKIT_URL\",\"value\":\"${{ secrets.LIVEKIT_URL }}\"},
                  {\"name\":\"LIVEKIT_API_KEY\",\"value\":\"${{ secrets.LIVEKIT_API_KEY }}\"},
