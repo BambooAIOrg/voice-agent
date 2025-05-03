@@ -120,7 +120,7 @@ jobs:
           --region $REGION \
           --AppId "$APP_ID" \
           --PackageType "Image" \
-          --PackageVersion "latest" \
+          --PackageVersion "${{ github.sha }}" \
           --ImageUrl "crpi-h63lvr41mcj56ogo.ap-southeast-1.personal.cr.aliyuncs.com/bambooai/vocab-agent:${{ github.sha }}" \
           --ImagePullSecret "$SECRET_NAME" \
           --Envs "[{\"name\":\"LIVEKIT_URL\",\"value\":\"${{ secrets.LIVEKIT_URL }}\"},
