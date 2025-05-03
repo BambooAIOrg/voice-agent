@@ -1,9 +1,10 @@
+from collections import deque
 import json
 import logging
 from dataclasses import dataclass, field
 import os
 from typing import Optional
-
+import psutil
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env.local")
 from livekit import api
@@ -290,9 +291,30 @@ async def request_fnc(request: JobRequest):
         logger.info(f"Rejecting request: {metadata}")
         await request.reject()
 
+def load_fnc(window_size=6, interval=0.5):
+    if not hasattr(load_fnc, "samples"):
+        load_fnc.samples = deque(maxlen=window_size)
+        load_fnc._initialized = False
+
+    if not load_fnc._initialized:
+        psutil.cpu_percent(interval=None)
+        load_fnc._initialized = True
+        return 0.0
+
+    value = psutil.cpu_percent(interval=interval) / 100.0
+    load_fnc.samples.append(value)
+
+    if len(load_fnc.samples) == 0:
+        return 0.0
+    
+    load = sum(load_fnc.samples) / len(load_fnc.samples)
+    logger.info(f"load: {load}")
+    return load
+
 if __name__ == "__main__":
     cli.run_app(WorkerOptions(
         entrypoint_fnc=entrypoint,
         prewarm_fnc=prewarm,
-        request_fnc=request_fnc
+        request_fnc=request_fnc,
+        load_fnc=load_fnc
     ))
