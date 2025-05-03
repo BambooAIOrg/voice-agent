@@ -246,7 +246,7 @@ async def entrypoint(ctx: JobContext):
         llm=openai.LLM(model="gpt-4.1"),
         stt=openai.STT(model="gpt-4o-transcribe"),
         tts=MinimaxTTS(
-            model="speech-02-hd",
+            model="speech-02-turbo",
             voice_id="Cantonese_CuteGirl",
             sample_rate=32000,
             bitrate=128000,
@@ -268,6 +268,7 @@ async def entrypoint(ctx: JobContext):
 
     ctx.add_shutdown_callback(log_usage)
 
+    logger.info(f"session started")
     await session.start(
         # Pass target_word when creating the first agent
         agent=GreetingAgent(target_word=target_word),
