@@ -291,13 +291,19 @@ async def request_fnc(request: JobRequest):
         logger.info(f"Rejecting request: {metadata}")
         await request.reject()
 
-def load_fnc(*args, window_size=6, interval=0.5):
+def load_fnc(*args, window_size=120, interval=0.5):
+    """
+    custom load function, collect sliding average of one minute
+    
+    window_size=120: keep 120 samples, 0.5 second interval approximately one minute
+    interval=0.5: sample interval 0.5 second
+    """
     if not hasattr(load_fnc, "samples"):
         load_fnc.samples = deque(maxlen=window_size)
         load_fnc._initialized = False
 
     if not load_fnc._initialized:
-        psutil.cpu_percent(interval=None)
+        psutil.cpu_percent(interval=None)  # initialize, discard first sample
         load_fnc._initialized = True
         return 0.0
 
@@ -308,8 +314,11 @@ def load_fnc(*args, window_size=6, interval=0.5):
         return 0.0
     
     load = sum(load_fnc.samples) / len(load_fnc.samples)
+    
+    # only print when load is high, reduce log volume
     if load > 0.5:
-        logger.info(f"load: {load}")
+        logger.info(f"load: {load:.4f}, current: {value:.4f}, samples: {len(load_fnc.samples)}")
+    
     return load
 
 if __name__ == "__main__":
