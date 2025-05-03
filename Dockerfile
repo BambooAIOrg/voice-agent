@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM registry.cn-hangzhou.aliyuncs.com/aliyun-python/python:3.12-slim
 
 WORKDIR /app
 
