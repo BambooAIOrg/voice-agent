@@ -291,7 +291,7 @@ async def request_fnc(request: JobRequest):
         logger.info(f"Rejecting request: {metadata}")
         await request.reject()
 
-def load_fnc(window_size=6, interval=0.5):
+def load_fnc(*args, window_size=6, interval=0.5):
     if not hasattr(load_fnc, "samples"):
         load_fnc.samples = deque(maxlen=window_size)
         load_fnc._initialized = False
