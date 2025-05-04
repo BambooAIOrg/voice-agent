@@ -13,8 +13,10 @@ __pycache__/
 .DS_Store
 */.DS_Store
 
-test-sae-deploy.sh
-create_jwt.py
-create_github_token.py
-private-key.pem
-list_installations.py
+# logs
+logs/
+*.log
+*.log.*
+*.log.*.*
+*.log.*.*.*
+*.log.*.*.*.*

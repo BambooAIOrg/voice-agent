@@ -24,7 +24,7 @@ from livekit.agents import (
 from livekit.agents.job import JobRequest
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import openai, silero
+from livekit.plugins import openai, silero, cartesia
 from livekit.plugins import noise_cancellation
 # from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
@@ -111,6 +111,7 @@ class EtymologyAgent(Agent):
         self.target_word = target_word
 
     async def on_enter(self):
+        logger.info(f"etymology agent enter")
         await self.session.generate_reply(
             instructions=f"In Chinese, start explaining the origin (来源) of '{self.target_word}'. Keep it brief. Ask if understood."
         )
@@ -243,14 +244,19 @@ async def entrypoint(ctx: JobContext):
 
     session = AgentSession[WordLearningData](
         vad=ctx.proc.userdata["vad"],
-        llm=openai.LLM(model="gpt-4.1"),
-        stt=openai.STT(model="gpt-4o-transcribe"),
-        tts=MinimaxTTS(
-            model="speech-02-turbo",
-            voice_id="Cantonese_CuteGirl",
-            sample_rate=32000,
-            bitrate=128000,
-            emotion="happy"
+        llm=openai.LLM(model="gpt-4.1-mini"),
+        stt=openai.STT(model="gpt-4o-mini-transcribe"),
+        # tts=MinimaxTTS(
+        #     model="speech-02-turbo",
+        #     voice_id="Cantonese_CuteGirl",
+        #     sample_rate=32000,
+        #     bitrate=128000,
+        #     emotion="happy"
+        # ),
+        tts=cartesia.TTS(
+            voice="7d6adbc0-3c4f-4213-9030-50878d391ccd",
+            language="zh",
+            speed='slowest',
         ),
         userdata=WordLearningData(target_word=target_word),
     )

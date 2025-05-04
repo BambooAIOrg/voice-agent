@@ -8,7 +8,6 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 livekit = ">=1.0.3"
-livekit-agents = "1.0.11"
 livekit-plugins-openai = "1.0.11"
 livekit-plugins-silero = "1.0.11"
 python-dotenv = ">=1.0,<2.0"
@@ -22,6 +21,9 @@ aiomysql = "^0.2.0"
 azure-cognitiveservices-speech = "^1.43.0"
 aliyun-log-python-sdk = "^0.9.19"
 loguru = "^0.7.3"
+livekit-api = "^1.0.2"
+livekit-agents = "^1.0.19"
+livekit-plugins-cartesia = "^1.0.19"
 
 [build-system]
 requires = ["poetry-core"]
