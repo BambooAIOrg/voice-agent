@@ -294,42 +294,27 @@ class SynthesizeStream(tts.SynthesizeStream):
 
         self._reconnect_event = asyncio.Event()
         self._no_tokens_sent_event = asyncio.Event()
+        
+        # 添加计数器跟踪未完成的任务数量
+        self._pending_tasks_count = 0
+        self._pending_tasks_lock = asyncio.Lock()
 
     async def _run(self) -> None:
-        ws: aiohttp.ClientWebSocketResponse | None = None
-        while True:
-            start_time = time.time()
-            logger.info(f"[{self._request_id}] Getting WebSocket connection from pool.")
-            async with self._pool.connection() as ws:
-                end_time = time.time()
-                logger.info(f"[{self._request_id}] Got WebSocket connection from pool. Time taken: {end_time - start_time:.4f}s")
-                # Create and run input, send, and receive tasks ONLY after task_started
-                input_task = asyncio.create_task(self._input_task())
-                send_task = asyncio.create_task(self._send_task(ws))
-                recv_task = asyncio.create_task(self._recv_task(ws))
-                tasks = [
-                    input_task,
-                    send_task,
-                    recv_task,
-                ]
-                wait_reconnect_task = asyncio.create_task(self._reconnect_event.wait())
+        async with self._pool.connection() as ws:
+            # Create and run input, send, and receive tasks ONLY after task_started
+            input_task = asyncio.create_task(self._input_task())
+            send_task = asyncio.create_task(self._send_task(ws))
+            recv_task = asyncio.create_task(self._recv_task(ws))
+            tasks = [
+                input_task,
+                send_task,
+                recv_task,
+            ]
 
-                try:
-                    done, _ = await asyncio.wait(
-                        [
-                            asyncio.gather(*tasks),
-                            wait_reconnect_task,
-                        ],
-                        return_when=asyncio.FIRST_COMPLETED
-                    )
-
-                    if wait_reconnect_task not in done:
-                        break
-                    self._reconnect_event.clear()
-                finally:
-                    await utils.aio.gracefully_cancel(
-                        *tasks, wait_reconnect_task
-                    )
+            try:
+                await asyncio.gather(*tasks)
+            finally:
+                await utils.aio.gracefully_cancel(*tasks)
 
     async def _input_task(self) -> None:
         """Reads text from the input channel and pushes it to the tokenizer."""
@@ -367,6 +352,12 @@ class SynthesizeStream(tts.SynthesizeStream):
                 }
                 logger.info(f"[{self._request_id}] Sending task_continue event: {send_payload}")
                 self._mark_started()
+                
+                # 增加待处理任务计数
+                async with self._pending_tasks_lock:
+                    self._pending_tasks_count += 1
+                    logger.debug(f"[{self._request_id}] Incremented pending tasks count to {self._pending_tasks_count}")
+                
                 await ws.send_json(send_payload)
                 has_sent_any_token = True
 
@@ -465,9 +456,16 @@ class SynthesizeStream(tts.SynthesizeStream):
                              logger.debug(f"[{self._request_id}] Pushed flushed frame of duration {frame.duration:.3f}s")
                         # Mark the end of the segment for this text chunk
                         emitter.flush()
-                        # Properly end the stream for is_final=True
-                        logger.debug(f"[{self._request_id}] Stream completed due to is_final=True. Breaking recv_task loop.")
-                        break
+                        
+                        # decrease the pending tasks count
+                        async with self._pending_tasks_lock:
+                            self._pending_tasks_count -= 1
+                            logger.debug(f"[{self._request_id}] Decremented pending tasks count to {self._pending_tasks_count}")
+                            
+                            # break the loop if all tasks are completed
+                            if self._pending_tasks_count <= 0:
+                                logger.debug(f"[{self._request_id}] All tasks completed. Breaking recv_task loop.")
+                                break
         except asyncio.TimeoutError:
             # Standard timeout occurred - server didn't respond or close connection in time
             logger.error(f"[{self._request_id}] Timeout waiting for WebSocket message or closure.")

@@ -48,7 +48,7 @@ class AliSTT(stt.STT):
         url: str = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1",
         appkey: str = "uOEo4DusjYLg1AZo",
         language: str = "zh-CN",
-        enable_intermediate_result: bool = True,
+        enable_intermediate_result: bool = False,
         enable_punctuation_prediction: bool = True,
         enable_inverse_text_normalization: bool = True,
         interim_results: bool = True,

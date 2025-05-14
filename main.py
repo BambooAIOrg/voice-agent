@@ -26,7 +26,7 @@ from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
 from livekit.plugins import openai, silero, cartesia
 from livekit.plugins import noise_cancellation
-# from plugins.aliyun.stt import AliSTT
+from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 
 logger = logging.getLogger("multi-agent-word-learning")
@@ -39,8 +39,7 @@ You are part of a multi-agent system, designed to make agent coordination and ex
 Transfers between agents are handled seamlessly in the background; do not mention or draw attention to these transfers in your conversation with the user.
 
 Role:
-You are a friendly and patient English tutor specifically helping Chinese students learning the English word '{target_word}'. 
-Use clear and simple **Chinese** for explanations and instructions, but use English for the target word, synonyms, example sentences, etc. 
+You are a friendly and patient English tutor specifically helping students learning the English word '{target_word}'. 
 Keep your responses very short and conversational. Ask questions frequently to ensure the student understands and stays engaged. 
 Avoid long lectures. Break down information into small, easy-to-digest pieces. Be very encouraging. 
 
@@ -62,9 +61,9 @@ class GreetingAgent(Agent):
     def __init__(self, target_word: str) -> None:
         # Define the specific task description for this agent
         specific_task = (
-            "Your specific role now is to welcome the student warmly in **Chinese**. "
+            "Your specific role now is to welcome the student warmly. "
             "Introduce the English word you are teaching today (already mentioned in the intro). Keep the introduction very brief. "
-            "Then, ask in Chinese if they are ready to start exploring the word's origins (词源). "
+            "Then, ask if they are ready to start exploring the word's origins. "
             "Once they confirm, call the 'start_etymology' function."
         )
         # Format the BASE template with the target word and this agent's specific task
@@ -78,7 +77,7 @@ class GreetingAgent(Agent):
     async def on_enter(self):
         # Reply prompt can be simpler as core instructions are set
         await self.session.generate_reply(
-            instructions=f"Welcome the student warmly in Chinese. Briefly re-introduce the word '{self.target_word}' and ask if they\'re ready for etymology (词源)."
+            instructions=f"Welcome the student warmly. Briefly re-introduce the word '{self.target_word}' and ask if they\'re ready for etymology."
         )
 
     @function_tool
@@ -245,11 +244,12 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession[WordLearningData](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1-mini"),
-        stt=openai.STT(
-            model="gpt-4o-mini-transcribe",
-            language="zh",
-            prompt="The following audio is from a Chinese student who is learning English with AI tutor."
-        ),
+        # stt=openai.STT(
+        #     model="gpt-4o-mini-transcribe",
+        #     language="zh",
+        #     prompt="The following audio is from a Chinese student who is learning English with AI tutor."
+        # ),
+        stt=AliSTT(),
         tts=MinimaxTTS(
             model="speech-02-turbo",
             voice_id="Cantonese_CuteGirl",
