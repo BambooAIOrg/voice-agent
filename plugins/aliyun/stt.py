@@ -48,7 +48,7 @@ class AliSTT(stt.STT):
         url: str = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1",
         appkey: str = "uOEo4DusjYLg1AZo",
         language: str = "zh-CN",
-        enable_intermediate_result: bool = False,
+        enable_intermediate_result: bool = True,
         enable_punctuation_prediction: bool = True,
         enable_inverse_text_normalization: bool = True,
         interim_results: bool = True,
@@ -60,7 +60,6 @@ class AliSTT(stt.STT):
                 interim_results=interim_results,
             )
         )
-
         
         self._opts = STTOptions(
             url=url,
@@ -171,6 +170,7 @@ class SpeechStream(stt.SpeechStream):
                 self._transcriber = None
 
     async def _run(self, max_retry: int = 3) -> None:
+        logger.info(f"Running STT")
         retry_count = 0
         while self._input_ch.qsize() or not self._input_ch.closed:
             try:

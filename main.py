@@ -1,3 +1,8 @@
+from dotenv import load_dotenv
+from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
+load_dotenv(dotenv_path=".env.local")
+install_mixed_language_tokenize()
+
 from collections import deque
 import json
 import logging
@@ -5,8 +10,7 @@ from dataclasses import dataclass, field
 import os
 from typing import Optional
 import psutil
-from dotenv import load_dotenv
-load_dotenv(dotenv_path=".env.local")
+
 from livekit import api
 from livekit.agents import (
     Agent,
@@ -64,7 +68,6 @@ class GreetingAgent(Agent):
             "Your specific role now is to welcome the student warmly. "
             "Introduce the English word you are teaching today (already mentioned in the intro). Keep the introduction very brief. "
             "Then, ask if they are ready to start exploring the word's origins. "
-            "Once they confirm, call the 'start_etymology' function."
         )
         # Format the BASE template with the target word and this agent's specific task
         formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
@@ -77,7 +80,7 @@ class GreetingAgent(Agent):
     async def on_enter(self):
         # Reply prompt can be simpler as core instructions are set
         await self.session.generate_reply(
-            instructions=f"Welcome the student warmly. Briefly re-introduce the word '{self.target_word}' and ask if they\'re ready for etymology."
+            instructions=f"Welcome the student warmly in Chinese. Briefly re-introduce the word '{self.target_word}' and ask if they\'re ready for etymology (词源)."
         )
 
     @function_tool
@@ -293,6 +296,10 @@ async def entrypoint(ctx: JobContext):
 async def request_fnc(request: JobRequest):
     logger.info(f"Received request: {request.room.metadata}")
     logger.info(f"ENV: {os.getenv('ENV')}")
+    if not request.room.metadata:
+        await request.reject()
+        return
+
     metadata = json.loads(request.room.metadata)
     if metadata.get("env") == os.getenv("ENV"):
         logger.info(f"Accepting request: {metadata}")
