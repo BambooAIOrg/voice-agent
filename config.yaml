@@ -1,0 +1,63 @@
+# Nacos configuration (optional, can override defaults or YAML values)
+nacos:
+  server_addresses: "http://8.216.64.15:8848" # Or fetch from environment variables
+  namespace: "3e87fec5-0df2-4099-b0cd-36df5ed7209f" # Or fetch from environment variables
+  username: "admin" # Consider using secrets management
+  password: "ECVTaZFY39vRdkq" # Consider using secrets management
+  enabled: true # Set to false to disable Nacos and only use local YAML
+
+# Application specific configurations
+app:
+  service_name: "platform_api" # Service name for Nacos service registration
+  service_port: 8000 # Service port for Nacos service registration
+  impersonation:
+    whitelist:
+      data_id: "app.impersonation.whitelist"
+      group: "DEFAULT_GROUP"
+      type: "JSON"
+      # Default value if Nacos is disabled or lookup fails (optional)
+      # default_content: '["user1@example.com", "user2@example.com"]' 
+  vocab:
+    agent:
+      instruction:
+        warmup:
+          data_id: "app.vocab.agent.instruction.warmup"
+          group: "agent_instruction"
+          type: "TEXT"
+        root_affix:
+          data_id: "app.vocab.agent.instruction.root_affix"
+          group: "agent_instruction"
+          type: "TEXT"
+        synonym:
+          data_id: "app.vocab.agent.instruction.synonym"
+          group: "agent_instruction"
+          type: "TEXT"
+        co_occurrence:
+          data_id: "app.vocab.agent.instruction.co_occurrence"
+          group: "agent_instruction"
+          type: "TEXT"
+        assessment:
+          data_id: "app.vocab.agent.instruction.assessment"
+          group: "agent_instruction"
+          type: "TEXT"
+      shot:
+        warmup:
+          data_id: "app.vocab.agent.shot.warmup"
+          group: "agent_shot"
+          type: "YAML"
+        root_affix:
+          data_id: "app.vocab.agent.shot.root_affix"
+          group: "agent_shot"
+          type: "YAML"
+        synonym:
+          data_id: "app.vocab.agent.shot.synonym"
+          group: "agent_shot"
+          type: "YAML"
+        co_occurrence:
+          data_id: "app.vocab.agent.shot.co_occurrence"
+          group: "agent_shot"
+          type: "YAML"
+        assessment:
+          data_id: "app.vocab.agent.shot.assessment"
+          group: "agent_shot"
+          type: "YAML"

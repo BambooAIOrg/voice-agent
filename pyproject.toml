@@ -24,6 +24,7 @@ loguru = "^0.7.3"
 livekit-api = "^1.0.2"
 livekit-agents = "^1.0.19"
 livekit-plugins-cartesia = "^1.0.19"
+nacos-sdk-python = "^2.0.6"
 
 [build-system]
 requires = ["poetry-core"]
