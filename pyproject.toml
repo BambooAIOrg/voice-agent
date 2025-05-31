@@ -25,6 +25,7 @@ livekit-api = "^1.0.2"
 livekit-agents = "^1.0.19"
 livekit-plugins-cartesia = "^1.0.19"
 nacos-sdk-python = "^2.0.6"
+bamboo-shared = {git = "git@github.com:BambooAIOrg/bamboo-shared.git", branch = "master"}
 
 [build-system]
 requires = ["poetry-core"]
