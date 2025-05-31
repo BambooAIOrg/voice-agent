@@ -59,7 +59,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         word=word
     )
     await context.initialize_async_context()
-    session = AgentSession[WordLearningData](
+    session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1-mini"),
         # stt=openai.STT(
@@ -80,7 +80,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         #     language="zh",
         #     speed='slowest',
         # ),
-        userdata=WordLearningData(target_word=target_word),
+        userdata=context,
     )
 
     usage_collector = metrics.UsageCollector()
@@ -99,7 +99,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     logger.info(f"session started")
     await session.start(
         # Pass target_word when creating the first agent
-        agent=GreetingAgent(target_word=target_word),
+        agent=GreetingAgent(context=context),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),

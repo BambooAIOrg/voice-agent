@@ -3,57 +3,42 @@ from livekit.agents import (
     RunContext,
 )
 from livekit.agents.llm import function_tool
+from agents.vocab.agents.etymology import EtymologyAgent
+from agents.vocab.context import AgentContext
+from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
 from logger import get_logger
 
 logger = get_logger(__name__)
 
-# These will be imported when needed to avoid circular imports
-BASE_INSTRUCTION_TEMPLATE = None
-WordLearningData = None
-EtymologyAgent = None
-
-def setup_imports():
-    """Call this to set up the imports after the module is loaded"""
-    global BASE_INSTRUCTION_TEMPLATE, WordLearningData, EtymologyAgent
-    from agents.vocab.entry import BASE_INSTRUCTION_TEMPLATE as base_template
-    from agents.vocab.entry import WordLearningData as data_class
-    from agents.vocab.entry import EtymologyAgent as etymology_class
-    BASE_INSTRUCTION_TEMPLATE = base_template
-    WordLearningData = data_class
-    EtymologyAgent = etymology_class
 
 class GreetingAgent(Agent):
-    def __init__(self, target_word: str) -> None:
-        # Ensure imports are set up
-        if BASE_INSTRUCTION_TEMPLATE is None:
-            setup_imports()
+    def __init__(self, context: AgentContext) -> None:
             
-        # Define the specific task description for this agent
-        specific_task = (
-            "Your specific role now is to welcome the student warmly. "
-            "Introduce the English word you are teaching today (already mentioned in the intro). Keep the introduction very brief. "
-            "Then, ask if they are ready to start exploring the word's origins. "
+        self.template_variables = TemplateVariables(
+            word=context.word,
+            nickname=context.user_info.nickname,
+            user_english_level=context.user_info.english_level,
+            user_characteristics=context.user_characteristics
         )
-        # Format the BASE template with the target word and this agent's specific task
-        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
-            target_word=target_word,
-            specific_task=specific_task
+        instructions = get_instructions(
+            self.template_variables,
+            "greeting",
         )
-        super().__init__(instructions=formatted_instructions)
-        self.target_word = target_word
+        super().__init__(instructions=instructions)
+        self.context = context
 
     async def on_enter(self):
         # Reply prompt can be simpler as core instructions are set
         await self.session.generate_reply(
-            instructions=f"Welcome the student warmly in Chinese. Briefly re-introduce the word '{self.target_word}' and ask if they\'re ready for etymology (词源)."
+            instructions=f"Welcome the student warmly in Chinese. Briefly re-introduce the word '{self.template_variables.word}' and ask if they\'re ready for etymology (词源)."
         )
 
     @function_tool
     async def start_etymology(
         self,
-        context: RunContext[WordLearningData],
+        context: RunContext[AgentContext],
     ):
         """Call this function when the student confirms they are ready to start learning about etymology."""
         logger.info("Handing off to EtymologyAgent.")
-        etymology_agent = EtymologyAgent(target_word=context.userdata.target_word)
+        etymology_agent = EtymologyAgent(context=context.userdata)
         return etymology_agent, None

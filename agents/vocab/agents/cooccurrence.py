@@ -3,38 +3,39 @@ from livekit.agents import (
     RunContext,
 )
 from livekit.agents.llm import function_tool
+from agents.vocab.context import AgentContext
+from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
+from agents.vocab.agents.sentence_practice import SentencePracticeAgent
 from logger import get_logger
 
 logger = get_logger(__name__)
 
 class CooccurrenceAgent(Agent):
-    def __init__(self, target_word: str) -> None:
-        specific_task = (
-            "Your specific task now is to discuss co-occurring words interactively. "
-            "Introduce *one type* of co-occurring English word (e.g., typical adjectives, common verbs) or *one English example phrase* at a time. Explain briefly in **Chinese**. "
-            "After each point, ask a simple question in Chinese"
-            "Keep turns short. Wait for the student's response. "
-            "When main co-occurrence patterns are covered, call 'start_practice'."
+    def __init__(self, context: AgentContext) -> None:
+        self.template_variables = TemplateVariables(
+            word=context.word,
+            nickname=context.user_info.nickname,
+            user_english_level=context.user_info.english_level,
+            user_characteristics=context.user_characteristics
         )
-        formatted_instructions = BASE_INSTRUCTION_TEMPLATE.format(
-            target_word=target_word,
-            specific_task=specific_task
+        instructions = get_instructions(
+            self.template_variables,
+            "cooccurrence",
         )
-        super().__init__(instructions=formatted_instructions)
-        self.target_word = target_word
+        super().__init__(instructions=instructions)
+        self.context = context
 
     async def on_enter(self):
         await self.session.generate_reply(
-            instructions=f"In Chinese, start discussing co-occurring words for '{self.target_word}'. Introduce just one type or example. Explain briefly in Chinese. Ask a question."
+            instructions=f"In Chinese, start discussing co-occurring words for '{self.template_variables.word}'. Introduce just one type or example. Explain briefly in Chinese. Ask a question."
         )
 
     @function_tool
     async def start_practice(
         self,
-        context: RunContext[WordLearningData],
+        context: RunContext[AgentContext],
     ):
         """Call this function ONLY after interactively discussing the main co-occurrence patterns."""
         logger.info("Handing off to SentencePracticeAgent after completing co-occurrence discussion.")
-        context.userdata.cooccurrence_explored = True
-        practice_agent = SentencePracticeAgent(target_word=context.userdata.target_word)
+        practice_agent = SentencePracticeAgent(context=context.userdata)
         return practice_agent, None
