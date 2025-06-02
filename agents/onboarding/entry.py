@@ -1,20 +1,16 @@
-"""
-Conversation Agent - Example implementation for general conversation
-"""
 from livekit.agents import (
     Agent,
     AgentSession,
     JobContext,
-    RunContext,
     RoomInputOptions,
     RoomOutputOptions,
     metrics,
 )
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import openai, silero, noise_cancellation
+from livekit.plugins import openai, noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
-from logger import get_logger
+from bamboo_shared.logger import get_logger
 
 logger = get_logger(__name__)
 

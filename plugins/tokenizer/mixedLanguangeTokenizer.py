@@ -115,7 +115,6 @@ def mixed_hyphenate_word(word: str) -> list[str]:
         else:  # 英文
             result.extend(original_hyphenate_word(current_segment))
     
-    logger.info(f"mixed_hyphenate_word: {result}")
     return result
 
 def mixed_split_words(text: str, ignore_punctuation: bool = True) -> list[tuple[str, int, int]]:

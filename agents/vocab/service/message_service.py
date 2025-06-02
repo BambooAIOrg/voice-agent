@@ -127,5 +127,6 @@ class MessageService:
                     hash=msg.hash,
                 ))
 
-        return ChatContext(items=chat_context_items), VocabularyPhase(conversation_thread_msgs[-1].meta_data.get("phase"))
+        phase = conversation_thread_msgs[-1].meta_data.get("phase") if conversation_thread_msgs else VocabularyPhase.WARMUP
+        return ChatContext(items=chat_context_items), VocabularyPhase(phase)
         

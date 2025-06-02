@@ -12,7 +12,8 @@ from bamboo_shared.models.Vocabulary import (
     VocabularyBook,
 )
 from sqlalchemy.sql import text
-from logger import get_logger
+from bamboo_shared.logger import get_logger
+
 from bamboo_shared.database import async_session_maker
 from sqlalchemy import select
 import json

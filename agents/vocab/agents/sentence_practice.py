@@ -4,9 +4,9 @@ from livekit.agents import (
     RunContext,
 )
 from livekit.agents.llm import function_tool
-from agents.vocab.entry import WordLearningData
 from agents.vocab.context import AgentContext
-from logger import get_logger
+from bamboo_shared.logger import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -31,10 +31,9 @@ class SentencePracticeAgent(Agent):
         )
 
     @function_tool
-    async def finish_practice_session(self, context: RunContext[WordLearningData]):
+    async def finish_practice_session(self, context: RunContext[AgentContext]):
         """Call this function ONLY when you decide the student has had enough practice."""
         logger.info("LLM decided to finish practice session.")
-        context.userdata.practice_finished = True
         await self.session.generate_reply(
             instructions=f"Congratulate the student in Chinese on completing practice for '{self.template_variables.word}'. Give final encouraging words in Chinese. End the session.",
             allow_interruptions=False

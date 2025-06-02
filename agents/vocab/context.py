@@ -20,7 +20,8 @@ from bamboo_shared.repositories import (
 from bamboo_shared.utils import time_now
 from agents.vocab.service.message_service import MessageService
 from agents.vocab.service.task_service import TaskService, WordTask
-from logger import get_logger
+from bamboo_shared.logger import get_logger
+
 import asyncio
 
 logger = get_logger(__name__)
@@ -218,10 +219,10 @@ class Context:
 
 
 class AgentContext(Context):
-    def __init__(self, chat_id: str, user_id: int, word: Vocabulary):
+    def __init__(self, chat_id: str, user_id: int, word_id: int):
         self.chat_id = chat_id
         self.user_id = user_id
-        self.word = word
+        self.word_id = word_id
         self.chat_repo = ChatRepository(user_id)
         self.word_repo = VocabularyRepository(user_id)
         self.user_repo = UserRepository(user_id)
@@ -263,15 +264,16 @@ class AgentContext(Context):
 
     async def _initialize_chat_reference(self):
         chat_reference = await self.word_repo.ensure_word_reference(
-            self.word.id,
+            self.word_id,
             self.chat_id
         )
         self.chat_reference = chat_reference
 
     async def _initialize_web_content(self):
-        web_content = await self.web_content_repo.get_web_content(self.word.id)
+        web_content = await self.web_content_repo.get_web_content(self.word_id)
         self.web_content = web_content
 
     async def _initialize_word_task(self):
         service = TaskService()
+        self.word = await self.word_repo.get_by_id(self.word_id)
         self.task_list = await service.get_daily_word_task_detail(self.user_id)

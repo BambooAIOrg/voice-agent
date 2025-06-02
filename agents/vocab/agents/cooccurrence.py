@@ -6,7 +6,8 @@ from livekit.agents.llm import function_tool
 from agents.vocab.context import AgentContext
 from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
 from agents.vocab.agents.sentence_practice import SentencePracticeAgent
-from logger import get_logger
+from bamboo_shared.logger import get_logger
+
 
 logger = get_logger(__name__)
 

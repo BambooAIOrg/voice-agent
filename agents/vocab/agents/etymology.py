@@ -6,7 +6,8 @@ from livekit.agents import (
 from livekit.agents.llm import function_tool
 from agents.vocab.context import AgentContext
 from agents.vocab.agents.synonym import SynonymAgent
-from logger import get_logger
+from bamboo_shared.logger import get_logger
+
 
 logger = get_logger(__name__)
 

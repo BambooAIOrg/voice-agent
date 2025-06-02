@@ -19,7 +19,8 @@ from livekit.plugins import openai
 from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
-from logger import get_logger
+from bamboo_shared.logger import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -45,18 +46,16 @@ class WordLearningData:
 
 async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     """Entrypoint for vocabulary learning agents"""
-    metadata = metadata.get("metadata", {})
     word_id = metadata.get("word_id", 0)
     chat_id = metadata.get("chat_id", "")
     user_id = metadata.get("user_id", 0)
     
     vocab_repo = VocabularyRepository(user_id)
-    word = await vocab_repo.get_by_id(word_id)
     
     context = AgentContext(
-        user_id=user_id,
+        user_id=int(user_id),
         chat_id=chat_id,
-        word=word
+        word_id=int(word_id)
     )
     await context.initialize_async_context()
     session = AgentSession[AgentContext](

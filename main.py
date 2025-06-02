@@ -16,10 +16,10 @@ from livekit.agents import (
 )
 from livekit.agents.job import JobRequest
 from livekit.plugins import silero
-from config.nacos import get_nacos_client
+from bamboo_shared.nacos import get_nacos_client
 from agents.entry import entrypoint
 
-logger = logging.getLogger("multi-agent-word-learning")
+logger = logging.getLogger("voice-agent-worker")
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()

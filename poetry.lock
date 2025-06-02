@@ -619,7 +619,7 @@ sqlalchemy = "^2.0.31"
 type = "git"
 url = "git@github.com:BambooAIOrg/bamboo-shared.git"
 reference = "master"
-resolved_reference = "5115eed6868ca6befd3721278e0dc21b33cbf911"
+resolved_reference = "d0f6cb28aeb6f8a10987e26583f8841566598640"
 
 [[package]]
 name = "certifi"
