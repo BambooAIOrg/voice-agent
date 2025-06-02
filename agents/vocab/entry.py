@@ -60,7 +60,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     await context.initialize_async_context()
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
-        llm=openai.LLM(model="gpt-4.1-mini"),
+        llm=openai.LLM(model="gpt-4.1"),
         # stt=openai.STT(
         #     model="gpt-4o-mini-transcribe",
         #     language="zh",

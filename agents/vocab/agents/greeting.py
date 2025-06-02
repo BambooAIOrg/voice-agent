@@ -14,8 +14,6 @@ logger = get_logger(__name__)
 
 class GreetingAgent(Agent):
     def __init__(self, context: AgentContext) -> None:
-            
-
         self.template_variables = TemplateVariables(
             word=context.word.word,
             nickname=context.user_info.nick_name,
@@ -24,6 +22,7 @@ class GreetingAgent(Agent):
         )
 
         logger.info(f"template_variables: {self.template_variables}")
+        logger.info(f"context: {context}")
         instructions = get_instructions(
             self.template_variables,
             "warmup",

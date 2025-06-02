@@ -149,7 +149,6 @@ def mixed_split_words(text: str, ignore_punctuation: bool = True) -> list[tuple[
                 result.append((char, i, i+1))
             i += 1
     
-    logger.info(f"mixed_split_words: {result}")
     return result
 
 def install_mixed_language_tokenize():

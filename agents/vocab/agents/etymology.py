@@ -15,14 +15,14 @@ logger = get_logger(__name__)
 class EtymologyAgent(Agent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
-            word=context.word,
-            nickname=context.user_info.nickname,
-            user_english_level=context.user_info.english_level,
-            user_characteristics=context.user_characteristics
+            word=context.word.word,
+            nickname=context.user_info.nick_name,
+            user_english_level=context.get_formatted_english_level(),
+            user_characteristics=context.get_formatted_characteristics()
         )
         instructions = get_instructions(
             self.template_variables,
-            "etymology",
+            "synonym",
         )
         super().__init__(instructions=instructions)
         self.context = context
@@ -30,7 +30,7 @@ class EtymologyAgent(Agent):
     async def on_enter(self):
         logger.info(f"etymology agent enter")
         await self.session.generate_reply(
-            instructions=f"In Chinese, start explaining the origin (来源) of '{self.template_variables.word}'. Keep it brief. Ask if understood."
+            instructions=f"start the etymology part of the lesson"
         )
 
     @function_tool

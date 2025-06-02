@@ -29,7 +29,7 @@ from livekit.agents.types import (
     NotGivenOr,
 )
 from livekit.agents.utils import is_given
-
+from plugins.tokenizer.mixedLanguangeTokenizer import MixedLanguageTokenizer
 from .log import logger
 from .models import (
     TTSEncoding,
@@ -155,10 +155,11 @@ class TTS(tts.TTS):
         )
         self._session = http_session
         # Add connection pool for WebSocket connections
+        # Set to 100 seconds to avoid Minimax server's 120-second timeout
         self._pool = utils.ConnectionPool[aiohttp.ClientWebSocketResponse](
             connect_cb=self._connect_ws,
             close_cb=self._close_ws,
-            max_session_duration=300,  # 5 minutes max session duration
+            max_session_duration=100,  # Less than Minimax's 120s server timeout
             mark_refreshed_on_get=True,
         )
         self._streams = weakref.WeakSet[SynthesizeStream]()
@@ -288,8 +289,13 @@ class SynthesizeStream(tts.SynthesizeStream):
         self._tts = tts
         self._opts = opts
         self._pool = pool
-        # Use a basic sentence tokenizer
-        self._sent_tokenizer_stream = tokenize.basic.SentenceTokenizer().stream() 
+        # Use MixedLanguageTokenizer for better Chinese-English text processing
+        self._sent_tokenizer_stream = MixedLanguageTokenizer(
+            min_sentence_len=3,
+            stream_context_len=5,
+            retain_format=True
+        ).stream()
+            # Fallback to basic tokenizer
         self._request_id = utils.shortuuid()  # Generate a request ID for this stream
 
         self._reconnect_event = asyncio.Event()
@@ -298,6 +304,7 @@ class SynthesizeStream(tts.SynthesizeStream):
         # 添加计数器跟踪未完成的任务数量
         self._pending_tasks_count = 0
         self._pending_tasks_lock = asyncio.Lock()
+        self._tokenizer_finished = False
 
     async def _run(self) -> None:
         async with self._pool.connection() as ws:
@@ -312,7 +319,14 @@ class SynthesizeStream(tts.SynthesizeStream):
             ]
 
             try:
-                await asyncio.gather(*tasks)
+                # Wait for all tasks to complete, but handle individual exceptions
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Log any exceptions that occurred
+                for i, result in enumerate(results):
+                    if isinstance(result, Exception):
+                        task_name = ["input_task", "send_task", "recv_task"][i]
+                        logger.warning(f"[{self._request_id}] {task_name} completed with exception: {result}")
             finally:
                 await utils.aio.gracefully_cancel(*tasks)
 
@@ -358,12 +372,24 @@ class SynthesizeStream(tts.SynthesizeStream):
                     self._pending_tasks_count += 1
                     logger.debug(f"[{self._request_id}] Incremented pending tasks count to {self._pending_tasks_count}")
                 
+                # Check if WebSocket is still open before sending
+                if ws.closed:
+                    logger.error(f"[{self._request_id}] WebSocket connection is closed, cannot send data")
+                    raise APIConnectionError("WebSocket connection closed by server")
+                
                 await ws.send_json(send_payload)
                 has_sent_any_token = True
 
-            logger.info(f"[{self._request_id}] Tokenizer stream completed.")
+            # Mark tokenizer as finished
+            async with self._pending_tasks_lock:
+                self._tokenizer_finished = True
+                logger.info(f"[{self._request_id}] Tokenizer stream completed. Total tasks sent: {self._pending_tasks_count}")
+            
             if not has_sent_any_token:
                 self._no_tokens_sent_event.set()
+        except (aiohttp.ClientError, ConnectionResetError, OSError) as e:
+            logger.error(f"[{self._request_id}] WebSocket connection error in _send_task: {e}")
+            raise APIConnectionError(f"WebSocket connection failed: {e}")
         except Exception as e:
             logger.exception(f"[{self._request_id}] Error in _send_task: {e}")
             raise
@@ -378,30 +404,52 @@ class SynthesizeStream(tts.SynthesizeStream):
         )       
         try:
             while True:
-                # 等待 WebSocket 消息 或 _no_tokens_sent_event 被设置
+                # 先检查是否应该退出
+                async with self._pending_tasks_lock:
+                    if self._tokenizer_finished and self._pending_tasks_count <= 0:
+                        logger.debug(f"[{self._request_id}] Tokenizer finished and all tasks completed. Breaking recv_task loop.")
+                        break
+
+                # 等待 WebSocket 消息或 _no_tokens_sent_event 被设置
                 receive_ws_task = asyncio.create_task(ws.receive())
                 wait_no_tokens_event_task = asyncio.create_task(self._no_tokens_sent_event.wait())
+                
+                tasks_to_wait = [receive_ws_task, wait_no_tokens_event_task]
+                
+                # 如果tokenizer已完成但还有待处理任务，添加适当的超时
+                timeout_task = None
+                async with self._pending_tasks_lock:
+                    if self._tokenizer_finished and self._pending_tasks_count > 0:
+                        # 给每个等待中的响应更短的超时时间
+                        timeout_task = asyncio.create_task(asyncio.sleep(5))
+                        tasks_to_wait.append(timeout_task)
 
                 done, pending = await asyncio.wait(
-                    [receive_ws_task, wait_no_tokens_event_task],
+                    tasks_to_wait,
                     return_when=asyncio.FIRST_COMPLETED
                 )
 
-                # 总是先取消未完成的任务
+                # 取消未完成的任务
                 for task in pending:
                     task.cancel()
                     try:
-                        await task # 等待取消完成
+                        await task
                     except asyncio.CancelledError:
-                        pass # 预期的
+                        pass
 
                 if wait_no_tokens_event_task in done:
                     logger.info(f"[{self._request_id}] _no_tokens_sent_event was set. "
                                    f"Assuming no response from server is expected. Ending _recv_task.")
-                    break # 跳出主循环，结束 _recv_task
+                    break
+                
+                if timeout_task and timeout_task in done:
+                    async with self._pending_tasks_lock:
+                        logger.warning(f"[{self._request_id}] Timeout waiting for remaining responses. "
+                                     f"Tokenizer finished but {self._pending_tasks_count} tasks still pending. Ending _recv_task.")
+                    break
 
                 # 如果是 ws.receive() 完成
-                msg = receive_ws_task.result() # 获取 ws.receive() 的结果
+                msg = receive_ws_task.result()
 
                 if msg.type in (
                     aiohttp.WSMsgType.CLOSED,
@@ -462,9 +510,9 @@ class SynthesizeStream(tts.SynthesizeStream):
                             self._pending_tasks_count -= 1
                             logger.debug(f"[{self._request_id}] Decremented pending tasks count to {self._pending_tasks_count}")
                             
-                            # break the loop if all tasks are completed
-                            if self._pending_tasks_count <= 0:
-                                logger.debug(f"[{self._request_id}] All tasks completed. Breaking recv_task loop.")
+                            # break the loop if tokenizer is finished and all tasks are completed
+                            if self._tokenizer_finished and self._pending_tasks_count <= 0:
+                                logger.debug(f"[{self._request_id}] Tokenizer finished and all tasks completed. Breaking recv_task loop.")
                                 break
         except asyncio.TimeoutError:
             # Standard timeout occurred - server didn't respond or close connection in time
