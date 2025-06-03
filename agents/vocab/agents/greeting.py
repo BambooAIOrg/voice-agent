@@ -68,7 +68,6 @@ class GreetingAgent(Agent):
         # 通用招呼
         general_greetings = [
             f"Hey {nickname}, great to see you!",
-            f"Yo {nickname}! You bring the energy, I'll bring the words!",
             f"Hiya {nickname}, how's going today?",
             f"Hey there, {nickname}! Ready for some English?",
             f"Hi {nickname}, how are you today?",
@@ -95,5 +94,5 @@ class GreetingAgent(Agent):
     ):
         """Call this function when the student confirms they are ready to start learning about etymology."""
         logger.info("Handing off to EtymologyAgent.")
-        etymology_agent = EtymologyAgent(context=context.userdata)
+        etymology_agent = EtymologyAgent(context=context.userdata, chat_ctx=context.session._chat_ctx)
         return etymology_agent, None

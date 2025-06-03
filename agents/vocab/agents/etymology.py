@@ -3,7 +3,7 @@ from livekit.agents import (
     Agent,
     RunContext,
 )
-from livekit.agents.llm import function_tool
+from livekit.agents.llm import function_tool, ChatContext
 from agents.vocab.context import AgentContext
 from agents.vocab.agents.synonym import SynonymAgent
 from bamboo_shared.logger import get_logger
@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 # Placeholder for the next agent - will be implemented next
 class EtymologyAgent(Agent):
-    def __init__(self, context: AgentContext) -> None:
+    def __init__(self, context: AgentContext, chat_ctx: ChatContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word.word,
             nickname=context.user_info.nick_name,
@@ -22,9 +22,12 @@ class EtymologyAgent(Agent):
         )
         instructions = get_instructions(
             self.template_variables,
-            "synonym",
+            "etymology",
         )
-        super().__init__(instructions=instructions)
+        super().__init__(
+            instructions=instructions,
+            chat_ctx=chat_ctx
+        )
         self.context = context
 
     async def on_enter(self):
@@ -40,5 +43,5 @@ class EtymologyAgent(Agent):
     ):
         """Call this function ONLY after interactively discussing origin, root, and affixes in Chinese."""
         logger.info("Handing off to SynonymAgent after completing etymology discussion.")
-        synonym_agent = SynonymAgent(context=context.userdata)
+        synonym_agent = SynonymAgent(context=context.userdata, chat_ctx=context.session._chat_ctx)
         return synonym_agent, None

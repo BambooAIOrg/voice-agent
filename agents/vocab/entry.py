@@ -69,7 +69,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         stt=AliSTT(),
         tts=MinimaxTTS(
             model="speech-02-turbo",
-            voice_id="Cantonese_CuteGirl",
+            voice_id="Chinese (Mandarin)_Cute_Spirit",
             sample_rate=32000,
             bitrate=128000,
             emotion="happy"

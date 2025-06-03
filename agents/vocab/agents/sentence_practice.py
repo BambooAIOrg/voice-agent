@@ -3,7 +3,7 @@ from livekit.agents import (
     Agent,
     RunContext,
 )
-from livekit.agents.llm import function_tool
+from livekit.agents.llm import function_tool, ChatContext
 from agents.vocab.context import AgentContext
 from bamboo_shared.logger import get_logger
 
@@ -11,7 +11,7 @@ from bamboo_shared.logger import get_logger
 logger = get_logger(__name__)
 
 class SentencePracticeAgent(Agent):
-    def __init__(self, context: AgentContext) -> None:
+    def __init__(self, context: AgentContext, chat_ctx: ChatContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,
             nickname=context.user_info.nickname,
@@ -22,7 +22,10 @@ class SentencePracticeAgent(Agent):
             self.template_variables,
             "sentence_practice",
         )
-        super().__init__(instructions=instructions)
+        super().__init__(
+            instructions=instructions,
+            chat_ctx=chat_ctx
+        )
         self.context = context
 
     async def on_enter(self):
