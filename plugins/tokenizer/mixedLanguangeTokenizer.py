@@ -117,8 +117,17 @@ def mixed_hyphenate_word(word: str) -> list[str]:
     
     return result
 
-def mixed_split_words(text: str, ignore_punctuation: bool = True) -> list[tuple[str, int, int]]:
-    """按字符级别切分中文文本，英文按单词切分"""
+def mixed_split_words(
+    text: str,
+    *,
+    ignore_punctuation: bool = True,
+    split_character: bool = False,
+) -> list[tuple[str, int, int]]:
+    """按字符级别切分中文文本，英文按单词切分。
+
+    兼容 LiveKit `split_words()` 的签名，接受 `split_character` 可选参数。
+    目前实现对 `split_character` 无特殊处理，仅为接口兼容保留。
+    """
     if not text:
         return []
     

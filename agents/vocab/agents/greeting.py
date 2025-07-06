@@ -28,7 +28,7 @@ class GreetingAgent(Agent):
         logger.info(f"context: {context}")
         instructions = get_instructions(
             self.template_variables,
-            "warmup",
+            "analysis_route",
         )
         super().__init__(instructions=instructions)
         self.context = context

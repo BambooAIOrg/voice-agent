@@ -29,7 +29,7 @@ class WordTask:
     word_id: int
     word: str
     chat_id: Optional[str] = None
-    phase: Optional[str] = VocabularyPhase.ROOT_AFFIX_ANALYSIS.value
+    phase: Optional[str] = VocabularyPhase.WORD_CREATION_LOGIC.value
     message_list: list[ChatMessage] = field(default_factory=list)
 
 

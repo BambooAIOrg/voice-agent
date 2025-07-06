@@ -164,19 +164,39 @@ class TTS(tts.TTS):
         )
         self._streams = weakref.WeakSet[SynthesizeStream]()
 
-    async def _connect_ws(self) -> aiohttp.ClientWebSocketResponse:
-        """Create a new WebSocket connection."""
+    async def _connect_ws(
+        self,
+        timeout: float | None = None,
+    ) -> aiohttp.ClientWebSocketResponse:
+        """Create a new WebSocket connection.
+
+        The ``utils.ConnectionPool`` helper passes a single positional
+        ``timeout`` argument to the ``connect_cb`` callback. To remain
+        compatible we accept this argument (defaulting to ``None``) and use it
+        when opening the underlying WebSocket.  If *timeout* is *None* we fall
+        back to the value provided by ``self._conn_options``.
+        """
+
         session = self._ensure_session()
-        url = self._opts.get_ws_url(f"/ws/v1/t2a_v2")
+        url = self._opts.get_ws_url("/ws/v1/t2a_v2")
         headers = {API_KEY_HEADER: self._opts.api_key}
-        
-        logger.debug(f"Connecting to WebSocket: {url}")
+
+        # Fallback to the instance-level connect options if provided, otherwise
+        # use a sensible default.  We ignore typing here because ``_conn_options``
+        # is injected by the LiveKit base class at runtime.
+        if timeout is not None:
+            ws_timeout = timeout
+        else:
+            ws_timeout = getattr(self, "_conn_options", type("_", (), {"timeout": 30.0})()).timeout  # type: ignore[attr-defined]
+
+        logger.debug(f"Connecting to WebSocket: {url} with timeout={ws_timeout}")
+
         ws = await asyncio.wait_for(
             session.ws_connect(url, headers=headers, heartbeat=30.0),
-            timeout=self._conn_options.timeout
+            timeout=ws_timeout,
         )
 
-        logger.debug(f"start task")
+        logger.debug("WebSocket connection established – sending task_start")
         await self._start_task(ws)
         return ws
     
@@ -275,7 +295,8 @@ class TTS(tts.TTS):
         await super().aclose()
 
 class SynthesizeStream(tts.SynthesizeStream):
-    """A stream that processes text incrementally as it arrives using WebSocket."""
+    """Stream implementation that tokenizes input text incrementally and
+    produces synthesized audio frames via Minimax WebSocket API."""
 
     def __init__(
         self,
@@ -284,49 +305,75 @@ class SynthesizeStream(tts.SynthesizeStream):
         opts: _TTSOptions,
         pool: utils.ConnectionPool[aiohttp.ClientWebSocketResponse],
         conn_options: APIConnectOptions = DEFAULT_API_CONNECT_OPTIONS,
-    ):
+    ) -> None:
         super().__init__(tts=tts, conn_options=conn_options)
+
         self._tts = tts
         self._opts = opts
         self._pool = pool
-        # Use MixedLanguageTokenizer for better Chinese-English text processing
-        self._sent_tokenizer_stream = MixedLanguageTokenizer(
-            min_sentence_len=3,
-            stream_context_len=5,
-            retain_format=True
-        ).stream()
-            # Fallback to basic tokenizer
-        self._request_id = utils.shortuuid()  # Generate a request ID for this stream
+
+        # Tokenize input text stream-wise for better latency
+        self._sent_tokenizer_stream = (
+            MixedLanguageTokenizer(
+                min_sentence_len=3,
+                stream_context_len=5,
+                retain_format=True,
+            ).stream()
+        )
+
+        self._request_id = utils.shortuuid()
 
         self._reconnect_event = asyncio.Event()
         self._no_tokens_sent_event = asyncio.Event()
-        
-        # 添加计数器跟踪未完成的任务数量
+
+        # Track pending tasks from server (per token) so we can know when to end
         self._pending_tasks_count = 0
         self._pending_tasks_lock = asyncio.Lock()
         self._tokenizer_finished = False
 
-    async def _run(self) -> None:
-        async with self._pool.connection() as ws:
-            # Create and run input, send, and receive tasks ONLY after task_started
+    # ---------------------------------------------------------------------
+    # Core run-loop required by livekit.agents.tts.SynthesizeStream
+    # ---------------------------------------------------------------------
+
+    async def _run(self, output_emitter: "tts.AudioEmitter") -> None:  # type: ignore[override]
+        """Implementation of the synthesis pipeline.
+
+        The LiveKit TTS framework will retry this function transparently on
+        recoverable errors, passing in an ``AudioEmitter`` instance that we
+        must use to push synthesized frames back to the SDK.
+        """
+
+        # Initialise emitter – enable *streaming* so we can push frames as we
+        # receive them from the server.
+        output_emitter.initialize(
+            request_id=self._request_id,
+            sample_rate=self._opts.sample_rate,
+            num_channels=self._opts.channels,
+            mime_type="audio/pcm",
+            stream=True,
+        )
+
+        # Start first segment so the emitter collects frames immediately.
+        output_emitter.start_segment(segment_id="0")
+
+        # Obtain WebSocket connection from pool (respect timeout settings)
+        async with self._pool.connection(timeout=self._conn_options.timeout) as ws:  # type: ignore[attr-defined]
+            # Launch concurrent tasks: push text, send to WS, receive audio.
             input_task = asyncio.create_task(self._input_task())
             send_task = asyncio.create_task(self._send_task(ws))
-            recv_task = asyncio.create_task(self._recv_task(ws))
-            tasks = [
-                input_task,
-                send_task,
-                recv_task,
-            ]
+            recv_task = asyncio.create_task(self._recv_task(ws, output_emitter))
+
+            tasks = [input_task, send_task, recv_task]
 
             try:
-                # Wait for all tasks to complete, but handle individual exceptions
                 results = await asyncio.gather(*tasks, return_exceptions=True)
-                
-                # Log any exceptions that occurred
-                for i, result in enumerate(results):
-                    if isinstance(result, Exception):
-                        task_name = ["input_task", "send_task", "recv_task"][i]
-                        logger.warning(f"[{self._request_id}] {task_name} completed with exception: {result}")
+
+                # Log any exception encountered within sub-tasks.
+                for idx, res in enumerate(results):
+                    if isinstance(res, Exception):
+                        name = ["input_task", "send_task", "recv_task"][idx]
+                        logger.warning(f"[{self._request_id}] {name} exited with: {res}")
+                        raise res
             finally:
                 await utils.aio.gracefully_cancel(*tasks)
 
@@ -394,14 +441,10 @@ class SynthesizeStream(tts.SynthesizeStream):
             logger.exception(f"[{self._request_id}] Error in _send_task: {e}")
             raise
 
-    async def _recv_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
+    async def _recv_task(self, ws: aiohttp.ClientWebSocketResponse, emitter: "tts.AudioEmitter") -> None:
         """Receives messages from the WebSocket and processes audio/errors."""
-        # Create an AudioByteStream to handle chunking into AudioFrames
-        audio_bstream = utils.audio.AudioByteStream(self._opts.sample_rate, self._opts.channels)
-        emitter = tts.SynthesizedAudioEmitter(
-            event_ch=self._event_ch,
-            request_id=self._request_id,
-        )       
+        # AudioEmitter expects raw audio bytes. We'll forward the PCM chunk
+        # bytes we receive from the server directly to the provided emitter.
         try:
             while True:
                 # 先检查是否应该退出
@@ -457,8 +500,6 @@ class SynthesizeStream(tts.SynthesizeStream):
                     aiohttp.WSMsgType.CLOSING,
                 ):
                     # Properly end the stream when WebSocket connection closes
-                    for frame in audio_bstream.flush():
-                        emitter.push(frame)
                     emitter.flush()
                     break
                 
@@ -473,8 +514,6 @@ class SynthesizeStream(tts.SynthesizeStream):
                         logger.error(f"[{self._request_id}] Minimax returned error: {error_msg}")
                         self._emit_error(APIStatusError(error_msg, status_code=400), recoverable=False)
                         # End the stream for critical errors
-                        for frame in audio_bstream.flush():
-                            emitter.push(frame)
                         emitter.flush()
                         break
 
@@ -484,11 +523,9 @@ class SynthesizeStream(tts.SynthesizeStream):
                             # Decode the hex data first
                             audio_data = bytes.fromhex(audio_hex)
                             
-                            # Feed the raw PCM bytes into the AudioByteStream
-                            # and push the resulting frames using the emitter
-                            for frame in audio_bstream.write(audio_data):
-                                emitter.push(frame)
-                                
+                            # Forward raw PCM bytes to emitter
+                            emitter.push(audio_data)
+                            
                         except ValueError as hex_e:
                             logger.exception(f"[{self._request_id}] Failed to decode hex audio:")
                             self._emit_error(APIError(f"Failed to decode hex audio", body=hex_e), recoverable=False)
@@ -498,11 +535,7 @@ class SynthesizeStream(tts.SynthesizeStream):
 
                     if is_final:
                         logger.debug(f"[{self._request_id}] Received is_final=True. Flushing audio stream and emitter.")
-                        # Flush any remaining buffered audio in AudioByteStream
-                        for frame in audio_bstream.flush():
-                             emitter.push(frame)
-                             logger.debug(f"[{self._request_id}] Pushed flushed frame of duration {frame.duration:.3f}s")
-                        # Mark the end of the segment for this text chunk
+                        # Indicate end-of-segment so emitter can emit final frame
                         emitter.flush()
                         
                         # decrease the pending tasks count
@@ -526,16 +559,12 @@ class SynthesizeStream(tts.SynthesizeStream):
             # Propagate error
             raise
         finally:
-            # Ensure any remaining audio in the buffer is flushed when the task ends
+            # Ensure emitter is flushed when the task ends
             try:
-                logger.debug(f"[{self._request_id}] Flushing final audio bytes in _recv_task finally block.")
-                for frame in audio_bstream.flush():
-                    emitter.push(frame)
-                    logger.debug(f"[{self._request_id}] Pushed final flushed frame of duration {frame.duration:.3f}s")
-                # Signal completion for clean termination
+                logger.debug(f"[{self._request_id}] Flushing emitter in _recv_task finally block.")
                 emitter.flush()
             except Exception as flush_e:
-                 logger.exception(f"[{self._request_id}] Error flushing audio buffer in finally block:")
+                 logger.exception(f"[{self._request_id}] Error flushing emitter in finally block:")
             # reset the event, so the next stream call can be reused
             self._no_tokens_sent_event.clear()
 

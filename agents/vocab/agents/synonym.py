@@ -15,7 +15,7 @@ class SynonymAgent(Agent):
     def __init__(self, context: AgentContext, chat_ctx: ChatContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,
-            nickname=context.user_info.nickname,
+            nickname=context.user_info.nick_name,
             user_english_level=context.user_info.english_level,
             user_characteristics=context.user_characteristics
         )
@@ -30,6 +30,7 @@ class SynonymAgent(Agent):
         self.context = context
 
     async def on_enter(self):
+        logger.info(f"SynonymAgent on_enter: {self.template_variables}")
         await self.session.generate_reply(
             instructions=f"In Chinese, start discussing synonyms for '{self.template_variables.word}'. Introduce just one aspect (e.g., one synonym or one difference). Explain briefly in Chinese. Ask a question."
         )

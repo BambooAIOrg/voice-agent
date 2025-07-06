@@ -58,13 +58,14 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         word_id=int(word_id)
     )
     await context.initialize_async_context()
+    
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1"),
         # stt=openai.STT(
-        #     model="gpt-4o-mini-transcribe",
-        #     language="zh",
-        #     prompt="The following audio is from a Chinese student who is learning English with AI tutor."
+        #     model="gpt-4o-transcribe",
+        #     detect_language=True,
+        #     prompt=f"The following audio is from a Chinese student who is learning English with AI tutor. The student is currently learning the word: {context.word.word}"
         # ),
         stt=AliSTT(),
         tts=MinimaxTTS(
@@ -102,6 +103,10 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
+            audio_enabled=True,
         ),
-        room_output_options=RoomOutputOptions(transcription_enabled=True),
+        room_output_options=RoomOutputOptions(
+            transcription_enabled=True,
+            audio_enabled=True,
+        ),
     )

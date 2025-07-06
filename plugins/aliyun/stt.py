@@ -48,10 +48,10 @@ class AliSTT(stt.STT):
         url: str = "wss://nls-gateway-cn-shanghai.aliyuncs.com/ws/v1",
         appkey: str = "uOEo4DusjYLg1AZo",
         language: str = "zh-CN",
-        enable_intermediate_result: bool = True,
+        enable_intermediate_result: bool = False,
         enable_punctuation_prediction: bool = True,
         enable_inverse_text_normalization: bool = True,
-        interim_results: bool = True,
+        interim_results: bool = False,
         timeout: float = 30.0,
     ):
         super().__init__(
@@ -95,19 +95,54 @@ class AliSTT(stt.STT):
     ) -> stt.SpeechEvent:
         raise NotImplementedError("This STT implementation only supports streaming recognition. Please use the stream() method instead")
 
-    def stream(self, *, language: str | None = None) -> SpeechStream:
-        logger.info('stream stt')
-        """Create a streaming recognition session"""
+    def stream(
+        self,
+        *,
+        language: str | None = None,
+        conn_options: APIConnectOptions | None = None,
+    ) -> "SpeechStream":
+        """Create a streaming recognition session.
+
+        Parameters
+        ----------
+        language: str | None
+            Optional language override for this stream.
+        conn_options: APIConnectOptions | None
+            Connection options forwarded by LiveKit. If *None* the default
+            configuration from ``livekit.agents.types.DEFAULT_API_CONNECT_OPTIONS``
+            will be used.
+        """
+        logger.info("stream stt")
+
+        # Clone base options to avoid mutating the instance-level config
         config = dataclasses.replace(self._opts)
-        if language:
+        if language is not None:
             config.language = language
-        return SpeechStream(config, stt=self)
+
+        # Defer import to avoid unnecessary dependencies at import time
+        from livekit.agents.types import DEFAULT_API_CONNECT_OPTIONS
+
+        return SpeechStream(
+            config,
+            stt=self,
+            conn_options=conn_options or DEFAULT_API_CONNECT_OPTIONS,
+        )
 
 class SpeechStream(stt.SpeechStream):
-    """Streaming speech recognition implementation"""
-    
-    def __init__(self, opts: STTOptions, stt: AliSTT, max_retry: int = 32) -> None:
-        super().__init__(stt=stt, conn_options=APIConnectOptions())
+    """Streaming speech recognition implementation for Ali Cloud."""
+
+    def __init__(
+        self,
+        opts: STTOptions,
+        *,
+        stt: AliSTT,
+        conn_options: APIConnectOptions,
+        max_retry: int = 32,
+    ) -> None:
+        # Initialise the parent mixin with the provided connection options so
+        # LiveKit can manage reconnect/back-pressure correctly.
+        super().__init__(stt=stt, conn_options=conn_options)
+
         self._opts = opts
         self._transcriber = None
         self._is_running = False
