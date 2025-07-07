@@ -35,6 +35,9 @@ async def entrypoint(ctx: JobContext):
     elif room_type == "onboarding":
         from agents.onboarding import onboarding_entrypoint
         await onboarding_entrypoint(ctx, metadata)
+    elif room_type == "official_website":
+        from agents.official_website import official_website_entrypoint
+        await official_website_entrypoint(ctx, metadata)
     # elif agent_type == "grammar":
     #     from agents.grammar import grammar_entrypoint
     #     await grammar_entrypoint(ctx, metadata)
