@@ -1,3 +1,4 @@
+from datetime import datetime
 from asyncio.log import logger
 from livekit.agents.llm.chat_context import ChatContext, FunctionCall, FunctionCallOutput, ChatMessage as LivekitChatMessage, ChatItem
 from bamboo_shared.repositories import ChatRepository
@@ -89,7 +90,7 @@ class MessageService:
             logger.error(f"Error getting cross-chat history: {str(e)}")
             return []
         
-    async def get_chat_context_and_phase(self) -> tuple[ChatContext, VocabularyPhase]:
+    async def get_chat_context_and_phase(self) -> tuple[ChatContext, VocabularyPhase, datetime | None]:
         conversation_thread_msgs = await self.get_cross_chat_history(self.chat_id)
         chat_context_items: list[ChatItem] = []
 
@@ -128,5 +129,6 @@ class MessageService:
                 ))
 
         phase = conversation_thread_msgs[-1].meta_data.get("phase") if conversation_thread_msgs else VocabularyPhase.WORD_CREATION_LOGIC.value
-        return ChatContext(items=chat_context_items), VocabularyPhase(phase)
+        last_communication_time = conversation_thread_msgs[-1].created_at if conversation_thread_msgs else None
+        return ChatContext(items=chat_context_items), VocabularyPhase(phase), last_communication_time
         

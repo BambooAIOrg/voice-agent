@@ -11,7 +11,7 @@ from bamboo_shared.logger import get_logger
 logger = get_logger(__name__)
 
 class SentencePracticeAgent(Agent):
-    def __init__(self, context: AgentContext, chat_ctx: ChatContext) -> None:
+    def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,
             nickname=context.user_info.nickname,
@@ -24,7 +24,7 @@ class SentencePracticeAgent(Agent):
         )
         super().__init__(
             instructions=instructions,
-            chat_ctx=chat_ctx
+            chat_ctx=context.chat_context
         )
         self.context = context
 

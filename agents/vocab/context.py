@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -18,10 +19,10 @@ from bamboo_shared.repositories import (
     VocabularyWebContentRepository,
 )
 from bamboo_shared.utils import time_now
+from bamboo_shared.service.vocabulary import WordTask, VocabPlanService
 from agents.vocab.service.message_service import MessageService
-from agents.vocab.service.task_service import TaskService, WordTask
 from bamboo_shared.logger import get_logger
-
+from livekit.agents.llm.chat_context import ChatContext
 import asyncio
 
 logger = get_logger(__name__)
@@ -73,6 +74,8 @@ class Context:
     chat_reference: ChatReference
     phase: VocabularyPhase
     task_list: List[WordTask]
+    last_communication_time: datetime | None
+    chat_context: ChatContext | None
 
     def __init__(self, user_info: User, user_characteristics: str, english_level: UserEnglishLevel, word: Vocabulary, web_content: VocabularyWebContent, chat_reference: ChatReference, task_list: List[WordTask]):
         self.user_info = user_info
@@ -207,7 +210,7 @@ class Context:
             )
             await chat_repo.update_chat_current_node(transition_message.id, chat_id)
             self.word = next_word
-            self.phase = VocabularyPhase.ROOT_AFFIX_ANALYSIS
+            self.phase = VocabularyPhase.WORD_CREATION_LOGIC
             self.chat_reference = await vocab_repo.ensure_word_reference(
                 next_word.id, chat_id
             )
@@ -233,6 +236,7 @@ class AgentContext(Context):
             writing=EnglishLevel.A1,
             speaking=EnglishLevel.A1
         )
+        self.chat_context = None
 
     async def initialize_async_context(self):
         await asyncio.gather(
@@ -245,9 +249,10 @@ class AgentContext(Context):
 
     async def _initialize_chat_context(self):
         message_service = MessageService(self.user_id, self.chat_id)
-        chat_context, phase = await message_service.get_chat_context_and_phase()
+        chat_context, phase, last_communication_time = await message_service.get_chat_context_and_phase()
         self.chat_context = chat_context
         self.phase = phase
+        self.last_communication_time = last_communication_time
 
     async def _initialize_user_info(self):
         user = await self.user_repo.get_by_id(self.user_id)
@@ -274,6 +279,6 @@ class AgentContext(Context):
         self.web_content = web_content
 
     async def _initialize_word_task(self):
-        service = TaskService()
+        service = VocabPlanService()
         self.word = await self.word_repo.get_by_id(self.word_id)
         self.task_list = await service.get_daily_word_task_detail(self.user_id)
