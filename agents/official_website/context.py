@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class Context:
-    """vocabulary learning context"""
+    """official_website learning context"""
 
     visitor_id: str
     current_word: str

@@ -140,16 +140,14 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
     # 生成自然语言 instructions 提示词
     if last_communication_time:
         instructions = (
-            f"欢迎用户再次回到学习页面。他们上次的交互时间是 {last_communication_time.isoformat()}。"
-            f"目前他们正在进入的是：{phase_description[phase.value]}。"
-            f"正在学习的单词「{current_word}」。"
-            f"请用温暖自然的语气欢迎他们回来，围绕这个单词轻松地引导他们继续今天的学习。"
+            f"用户上次交互时间为 {last_communication_time.isoformat()}，当前时间是 {now.isoformat()}。"
+            f"目前用户正在进入的是：{phase_description[phase.value]}，正在学习的单词「{current_word}」。"
+            f"请用1句温暖自然的语气欢迎用户回来，可以酌情融入当前时间，自然引导他们继续学习这个单词，避免正式或冗长表达。"
         )
     else:
         instructions = (
             f"这是用户今天第一次进入学习页面，当前时间是 {now.isoformat()}。"
-            f"他们将开始的是 {phase_description[phase.value]}。"
-            f"今天要学习的单词是「{current_word}」。"
-            f"请用自然轻快、亲切友好的语气欢迎用户，并以这个单词为出发点引导他们进入今天的学习。避免太正式，语气自然即可。"
+            f"目前将体验的是 {phase_description[phase.value]}，要学习的单词是「{current_word}」。"
+            f"请用1句自然轻快、亲切友好的语气欢迎用户，可以酌情融入当前时间，自然引导他们开始学习这个单词，避免正式或冗长表达。"
         )
     await session.generate_reply(instructions=instructions)

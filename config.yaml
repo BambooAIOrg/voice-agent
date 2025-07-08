@@ -61,3 +61,15 @@ app:
           data_id: "app.vocab.agent.shot.assessment"
           group: "agent_shot"
           type: "YAML"
+  official_website:
+    agent:
+      instruction:
+        word_creation_logic:
+          data_id: "app.official_website.agent.instruction.word_creation_logic"
+          group: "agent_instruction"
+          type: "TEXT"
+      shot:
+        word_creation_logic:
+          data_id: "app.official_website.agent.shot.word_creation_logic"
+          group: "agent_shot"
+          type: "YAML"
