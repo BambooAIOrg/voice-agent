@@ -3,11 +3,10 @@ from livekit.agents import (
     Agent,
     RunContext,
 )
-from livekit.agents.llm import function_tool, ChatContext
-from agents.vocab.context import AgentContext
-from agents.vocab.agents.synonym import SynonymAgent
-from bamboo_shared.logger import get_logger
+from livekit.agents.llm import function_tool
 
+from agents.vocab.context import AgentContext
+from bamboo_shared.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -37,11 +36,18 @@ class WordCreationAnalysisAgent(Agent):
     #     )
 
     @function_tool
-    async def start_synonyms(
+    async def transfer_to_main_schedule_agent(
         self,
         context: RunContext[AgentContext],
     ):
         """Call this function ONLY after interactively discussing origin, root, and affixes in Chinese."""
-        logger.info("Handing off to SynonymAgent after completing etymology discussion.")
-        synonym_agent = SynonymAgent(context=context.userdata, chat_ctx=context.session._chat_ctx)
-        return synonym_agent, None
+        from agents.vocab.agents.cooccurrence import CooccurrenceAgent
+        from agents.vocab.agents.synonym import SynonymAgent
+        similar_words = await self.context.word.similar_words
+
+        if similar_words and len(similar_words) > 0:
+            agent = SynonymAgent(context=context.userdata)
+            return agent, None
+        else:
+            agent = CooccurrenceAgent(context=context.userdata)
+            return agent, None

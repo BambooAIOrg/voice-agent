@@ -8,7 +8,6 @@ from agents.vocab.agents.route_analysis import RouteAnalysisAgent
 from agents.vocab.agents.synonym import SynonymAgent
 from agents.vocab.context import AgentContext, VocabularyPhase
 from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
-from bamboo_shared.repositories import VocabularyRepository
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
@@ -145,4 +144,5 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     else:
         instructions = f"This is the first learning session of the day for the user, {nickname}. The current time is {now.isoformat()}. Start the conversation with a warm, friendly, and casual greeting that is appropriate for the time of day. Just a simple greeting is enough."
 
+    logger.info(f"instructions: {instructions}")
     await session.generate_reply(instructions=instructions)

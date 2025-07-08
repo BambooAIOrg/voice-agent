@@ -5,7 +5,6 @@ from livekit.agents import (
 from livekit.agents.llm import function_tool, ChatContext
 from agents.vocab.context import AgentContext
 from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
-from agents.vocab.agents.sentence_practice import SentencePracticeAgent
 from bamboo_shared.logger import get_logger
 
 
@@ -15,13 +14,13 @@ class CooccurrenceAgent(Agent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,
-            nickname=context.user_info.nickname,
-            user_english_level=context.user_info.english_level,
+            nickname=context.user_info.nick_name,
+            user_english_level=context.get_formatted_english_level(),
             user_characteristics=context.user_characteristics
         )
         instructions = get_instructions(
             self.template_variables,
-            "cooccurrence",
+            "co_occurrence",
         )
         super().__init__(
             instructions=instructions,
@@ -40,6 +39,8 @@ class CooccurrenceAgent(Agent):
         context: RunContext[AgentContext],
     ):
         """Call this function ONLY after interactively discussing the main co-occurrence patterns."""
+        from agents.vocab.agents.sentence_practice import SentencePracticeAgent
         logger.info("Handing off to SentencePracticeAgent after completing co-occurrence discussion.")
-        practice_agent = SentencePracticeAgent(context=context.userdata, chat_ctx=context.session._chat_ctx)
+        context.userdata.chat_context = context.session._chat_ctx
+        practice_agent = SentencePracticeAgent(context=context.userdata)
         return practice_agent, None

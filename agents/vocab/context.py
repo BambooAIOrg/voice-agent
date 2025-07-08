@@ -2,12 +2,10 @@ from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
 from typing import Any, Dict, List
-from uuid import uuid4
 from bamboo_shared.models import (
     User,
     Vocabulary,
     VocabularyWebContent,
-    ChatMessage,
     ChatReference,
 )
 from bamboo_shared.enums.vocabulary import VocabularyPhase
@@ -18,7 +16,6 @@ from bamboo_shared.repositories import (
     VocabularyRepository,
     VocabularyWebContentRepository,
 )
-from bamboo_shared.utils import time_now
 from bamboo_shared.service.vocabulary import WordTask, VocabPlanService
 from agents.vocab.service.message_service import MessageService
 from bamboo_shared.logger import get_logger
@@ -117,50 +114,7 @@ class Context:
             "word_id": self.word.id,
             "word": self.word.word,
         }
-
-    async def create_cross_chat_transition_message(
-        self,
-        parent_chat_id: str, 
-        parent_message_id: str, 
-        word: str
-    ) -> ChatMessage:
-        """
-        create cross-chat transition message to connect different word learning sessions
-        Args:
-            parent_chat_id: the ID of the previous chat
-            parent_message_id: the ID of the last message of the previous chat
-            word: the new word to learn
-            
-        Returns:
-            the transition message
-        """
-        message_id = str(uuid4())
-        
-        # create a special system message to connect different chats
-        meta_data = {
-            "is_transition": True,
-            "parent_chat_id": parent_chat_id,
-            "parent_message_id": parent_message_id,
-            "new_word": word,
-            "is_visually_hidden": True
-        }
-        
-        transition_message = ChatMessage(
-            id=message_id,
-            author={"role": "system"},
-            chat_id=self.chat_id,
-            user_id=self.user_info.id,
-            parent_message_id=None,  # this message has no regular parent message
-            content=f"Start learning the new word: {word}",
-            status="finished_successfully",
-            meta_data=meta_data,
-            create_time=time_now()
-        )
-        
-        # save the message
-        await self.chat_repo.save_messages([transition_message])
-        return transition_message
-
+    
     async def go_next_word(self):
         """进入下一个单词的学习"""
         chat_reference_repo = ChatReferenceRepository(self.user_info.id)
@@ -203,12 +157,6 @@ class Context:
             if not prev_chat or not prev_chat.current_node:
                 raise ValueError(f"prev_chat.current_node is None, parent_chat_id: {parent_chat_id} prev_chat: {prev_chat}")
 
-            transition_message = await self.create_cross_chat_transition_message(
-                parent_chat_id=parent_chat_id,
-                parent_message_id=prev_chat.current_node,
-                word=next_word.word
-            )
-            await chat_repo.update_chat_current_node(transition_message.id, chat_id)
             self.word = next_word
             self.phase = VocabularyPhase.WORD_CREATION_LOGIC
             self.chat_reference = await vocab_repo.ensure_word_reference(

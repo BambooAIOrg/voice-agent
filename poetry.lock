@@ -604,7 +604,7 @@ description = "Shared models and utilities for Bamboo platform"
 optional = false
 python-versions = "^3.12"
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 openai = "^1.82.0"
@@ -616,10 +616,8 @@ pyyaml = "^6.0.2"
 sqlalchemy = "^2.0.31"
 
 [package.source]
-type = "git"
-url = "git@github.com:BambooAIOrg/bamboo-shared.git"
-reference = "master"
-resolved_reference = "a84aad4f607ad4a04abe2429b47b2d25dfe0ae47"
+type = "directory"
+url = "bamboo-shared"
 
 [[package]]
 name = "beautifulsoup4"
@@ -4232,4 +4230,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "080d84f23fdd3f4f8f08092107a88d6be8720d5fd7448151a9f01fe15218c0d7"
+content-hash = "a6244b15ee17a5c8c0d3c586a3c5a186adf9ebac7642dce2f0a1647e6dc68ce0"

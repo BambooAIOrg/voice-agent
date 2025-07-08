@@ -3,10 +3,10 @@ from livekit.agents import (
     Agent,
     RunContext,
 )
-from livekit.agents.llm import function_tool, ChatContext
+from livekit.agents.llm import function_tool
 from agents.vocab.context import AgentContext
 from bamboo_shared.logger import get_logger
-
+from agents.vocab.agents.route_analysis import RouteAnalysisAgent
 
 logger = get_logger(__name__)
 
@@ -34,11 +34,12 @@ class SentencePracticeAgent(Agent):
         )
 
     @function_tool
-    async def finish_practice_session(self, context: RunContext[AgentContext]):
-        """Call this function ONLY when you decide the student has had enough practice."""
-        logger.info("LLM decided to finish practice session.")
-        await self.session.generate_reply(
-            instructions=f"Congratulate the student in Chinese on completing practice for '{self.template_variables.word}'. Give final encouraging words in Chinese. End the session.",
-            allow_interruptions=False
-        )
-        return None
+    async def transfer_to_next_word_agent(
+        self,
+        context: RunContext[AgentContext],
+    ):
+        """Call this function when the student confirms they are ready to start learning about etymology."""
+        logger.info("Handing off to EtymologyAgent.")
+        context.userdata.chat_context = context.session._chat_ctx
+        agent = RouteAnalysisAgent(context=context.userdata)
+        return agent, None
