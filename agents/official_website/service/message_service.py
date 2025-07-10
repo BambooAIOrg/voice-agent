@@ -139,6 +139,6 @@ class MessageService:
         # )
 
         chat_context_items: list[ChatItem] = []
-        phase = OfficialWebsitePhase.WORD_CREATION_LOGIC.value
+        phase = OfficialWebsitePhase.VOCABULARY.value
         last_communication_time = None
         return ChatContext(items=chat_context_items), OfficialWebsitePhase(phase), last_communication_time

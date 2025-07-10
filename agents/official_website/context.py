@@ -34,6 +34,12 @@ class Context:
             "phase": self.phase.value,
         }
 
+    def get_phase(self) -> str:
+        return self.phase.value
+
+    def update_phase(self, phase: OfficialWebsitePhase):
+        self.phase = phase
+
 
 class AgentContext(Context):
     def __init__(self, visitor_id: str):

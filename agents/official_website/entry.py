@@ -1,12 +1,17 @@
 from datetime import datetime
 from dotenv import load_dotenv
 import pytz
-from agents.official_website.agents.cooccurrence import CooccurrenceAgent
-from agents.official_website.agents.word_creation_analysis import WordCreationAnalysisAgent
+import json
+import asyncio
+from livekit.rtc import DataPacket
 from bamboo_shared.enums.official_website import OfficialWebsitePhase
-from agents.official_website.agents.synonym import SynonymAgent
 from agents.official_website.context import AgentContext
 from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
+from agents.official_website.agents.vocabulary import VocabularyAgent
+from agents.official_website.agents.scene import SceneAgent
+from agents.official_website.agents.writing import WritingAgent
+from agents.official_website.agents.chat import ChatAgent
+
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
@@ -26,28 +31,8 @@ from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 from bamboo_shared.logger import get_logger
 
-
 logger = get_logger(__name__)
 
-# Import GreetingAgent from the agents module
-# from agents.vocab.agents.greeting import GreetingAgent
-
-@dataclass
-class WordLearningData:
-    target_word: str
-    etymology_explored: bool = False
-    synonyms_explored: bool = False
-    cooccurrence_explored: bool = False
-    practice_finished: bool = False
-
-
-
-# Function to get the current job context (replace if needed)
-# def get_job_context() -> JobContext:
-#     # This function needs to be implemented or imported correctly
-#     # based on how JobContext is managed in your setup.
-#     # For now, it's a placeholder.
-#     pass
 
 async def official_website_entrypoint(ctx: JobContext, metadata: dict):
     """Entrypoint for official_website learning agents"""
@@ -97,15 +82,55 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
 
     logger.info(f"session started")
 
-    agent = None
+    async def switch_agent(phase: OfficialWebsitePhase):
+        # 更新阶段
+        await context.update_phase(phase)
 
+
+
+
+        # 发送确认消息
+        asyncio.create_task(
+            ctx.room.local_participant.publish_data(
+                json.dumps({"type": "agent_switched", "phase": phase}).encode("utf-8"),
+                reliable=True,
+                topic="agent_control"
+            )
+        )
+        logger.info(f"Agent 切换成功: {phase}")
+
+
+    # 监听前端消息
+    @ctx.room.on("data_received")
+    def _on_data_received(payload: DataPacket):
+        try:
+            data = json.loads(payload.data.decode("utf-8"))
+            if data.get("type") == "switch_agent":
+                phase = data.get("phase")
+                # 异步调用 switch_agent（未实现，需补充）
+                asyncio.create_task(switch_agent(phase))
+        except Exception as e:
+            logger.error(f"处理消息失败: {e}")
+            asyncio.create_task(
+                ctx.room.local_participant.publish_data(
+                    json.dumps({"type": "agent_switch_failed", "phase": "", "error": str(e)}).encode(
+                        "utf-8"),
+                    reliable=True,
+                    topic="agent_control"
+                )
+            )
+
+
+    agent = None
     match context.phase:
-        case OfficialWebsitePhase.WORD_CREATION_LOGIC:
-            agent = WordCreationAnalysisAgent(context=context)
-        case OfficialWebsitePhase.SYNONYM_DIFFERENTIATION:
-            agent = SynonymAgent(context=context)
-        case OfficialWebsitePhase.CO_OCCURRENCE:
-            agent = CooccurrenceAgent(context=context)
+        case OfficialWebsitePhase.VOCABULARY:
+            agent = VocabularyAgent(context=context)
+        case OfficialWebsitePhase.SCENE:
+            agent = SceneAgent(context=context)
+        case OfficialWebsitePhase.WRITING:
+            agent = WritingAgent(context=context)
+        case OfficialWebsitePhase.CHAT:
+            agent = ChatAgent(context=context)
         case _:
             raise ValueError(f"Invalid phase: {context.phase}")
 
@@ -132,22 +157,23 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
 
     # 简洁中文说明
     phase_description = {
-        "word_creation_logic": "单词的构词逻辑模块，帮助用户掌握前缀、词根和后缀的构成方式，从而更轻松理解和记忆单词。",
-        "synonym_differentiation": "同义词区分模块，帮助用户辨析含义相近的单词之间的细微区别。",
-        "co_occurrence": "共现词模块，展示单词在真实语境中常见的搭配和使用方式，增强语感和语言自然度。",
+        "vocabulary": "",
+        "scene": "",
+        "writing": "",
+        "chat": "",
     }
 
     # 生成自然语言 instructions 提示词
     if last_communication_time:
         instructions = (
             f"用户上次交互时间为 {last_communication_time.isoformat()}，当前时间是 {now.isoformat()}。"
-            f"目前用户正在进入的是：{phase_description[phase.value]}，正在学习的单词「{current_word}」。"
-            f"请用1句温暖自然的语气欢迎用户回来，可以酌情融入当前时间，自然引导他们继续学习这个单词，避免正式或冗长表达。"
+            f"目前用户正在介绍的产品功能模块的是：{phase_description[phase.value]}。"
+            f"请用1句温暖自然的语气欢迎用户回来，可以酌情融入当前时间，继续介绍这个功能模块，避免正式或冗长表达。"
         )
     else:
         instructions = (
-            f"这是用户今天第一次进入学习页面，当前时间是 {now.isoformat()}。"
-            f"目前将体验的是 {phase_description[phase.value]}，要学习的单词是「{current_word}」。"
-            f"请用1句自然轻快、亲切友好的语气欢迎用户，可以酌情融入当前时间，自然引导他们开始学习这个单词，避免正式或冗长表达。"
+            f"这是用户今天第一次进入产品介绍页面，当前时间是 {now.isoformat()}。"
+            f"目前将介绍的产品功能模块是 {phase_description[phase.value]}。"
+            f"请用1句自然轻快、亲切友好的语气欢迎用户，可以酌情融入当前时间，介绍这个功能模块，避免正式或冗长表达。"
         )
     await session.generate_reply(instructions=instructions)
