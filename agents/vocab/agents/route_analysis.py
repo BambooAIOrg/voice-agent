@@ -25,6 +25,7 @@ class RouteAnalysisAgent(Agent):
         instructions = get_instructions(
             self.template_variables,
             "analysis_route",
+            voice_mode=True
         )
         super().__init__(
             instructions=instructions,

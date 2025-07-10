@@ -21,6 +21,7 @@ class SentencePracticeAgent(Agent):
         instructions = get_instructions(
             self.template_variables,
             "sentence_practice",
+            voice_mode=True
         )
         super().__init__(
             instructions=instructions,

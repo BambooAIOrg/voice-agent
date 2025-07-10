@@ -3,7 +3,7 @@ from livekit.agents import (
     Agent,
     RunContext,
 )
-from livekit.agents.llm import function_tool
+from livekit.agents.llm import function_tool, ChatContext
 
 from agents.vocab.context import AgentContext
 from bamboo_shared.logger import get_logger
@@ -22,6 +22,7 @@ class WordCreationAnalysisAgent(Agent):
         instructions = get_instructions(
             self.template_variables,
             "word_creation_logic",
+            voice_mode=True
         )
         super().__init__(
             instructions=instructions,
@@ -35,6 +36,10 @@ class WordCreationAnalysisAgent(Agent):
     #         instructions=f"start the etymology part of the lesson"
     #     )
 
+    async def llm_node(self, chat_ctx: ChatContext, tools, model_settings):
+        logger.info(f"llm_node: {chat_ctx.to_dict()}")
+        # 调用父类的默认实现
+        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
     @function_tool
     async def transfer_to_main_schedule_agent(
         self,
@@ -43,8 +48,10 @@ class WordCreationAnalysisAgent(Agent):
         """Call this function ONLY after interactively discussing origin, root, and affixes in Chinese."""
         from agents.vocab.agents.cooccurrence import CooccurrenceAgent
         from agents.vocab.agents.synonym import SynonymAgent
-        similar_words = await self.context.word.similar_words
+        similar_words = self.context.word.similar_words
 
+        logger.info(f"similar_words: {similar_words}")
+        logger.info(f"chat ctx: {context.userdata.chat_context}")
         if similar_words and len(similar_words) > 0:
             agent = SynonymAgent(context=context.userdata)
             return agent, None

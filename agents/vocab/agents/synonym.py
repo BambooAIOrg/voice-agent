@@ -22,6 +22,7 @@ class SynonymAgent(Agent):
         instructions = get_instructions(
             self.template_variables,
             "synonym",
+            voice_mode=True
         )
         super().__init__(
             instructions=instructions,

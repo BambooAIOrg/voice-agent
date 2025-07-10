@@ -21,6 +21,7 @@ class CooccurrenceAgent(Agent):
         instructions = get_instructions(
             self.template_variables,
             "co_occurrence",
+            voice_mode=True
         )
         super().__init__(
             instructions=instructions,
