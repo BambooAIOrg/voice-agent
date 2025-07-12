@@ -10,7 +10,7 @@ from bamboo_shared.logger import get_logger
 
 logger = get_logger(__name__)
 
-class CooccurrenceAgent(Agent):
+class CoOccurrenceAgent(Agent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,

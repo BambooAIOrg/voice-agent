@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
+from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 

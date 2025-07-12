@@ -1,13 +1,7 @@
-from datetime import datetime
 from dotenv import load_dotenv
-import pytz
-from agents.vocab.agents.cooccurrence import CooccurrenceAgent
-from agents.vocab.agents.sentence_practice import SentencePracticeAgent
-from agents.vocab.agents.word_creation_analysis import WordCreationAnalysisAgent
-from agents.vocab.agents.route_analysis import RouteAnalysisAgent
-from agents.vocab.agents.synonym import SynonymAgent
-from agents.vocab.context import AgentContext, VocabularyPhase
-from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
+from agents.vocab.context import AgentContext
+from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
+from agents.vocab.agents.greeting_agent import GreetingAgent
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
@@ -102,24 +96,8 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
 
     logger.info(f"session started")
 
-    agent = None
-
-    match context.phase:
-        case VocabularyPhase.ANALYSIS_ROUTE:
-            agent = RouteAnalysisAgent(context=context)
-        case VocabularyPhase.WORD_CREATION_LOGIC:
-            agent = WordCreationAnalysisAgent(context=context)
-        case VocabularyPhase.SYNONYM_DIFFERENTIATION:
-            agent = SynonymAgent(context=context)
-        case VocabularyPhase.CO_OCCURRENCE:
-            agent = CooccurrenceAgent(context=context)
-        case VocabularyPhase.QUESTION_ANSWER:
-            agent = SentencePracticeAgent(context=context)
-        case _:
-            raise ValueError(f"Invalid phase: {context.phase}")
-
     await session.start(
-        agent=agent,
+        agent=GreetingAgent(context=context),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
@@ -130,19 +108,3 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
             audio_enabled=True,
         ),
     )
-
-    nickname = context.user_info.nick_name
-
-    # 获取北京时间
-    beijing_tz = pytz.timezone('Asia/Shanghai')
-    now = datetime.now(beijing_tz)
-
-    last_communication_time = context.last_communication_time
-    instructions = ''
-    if last_communication_time:
-        instructions = f"The user, {nickname}, has returned to continue their learning session. Their last interaction was at {last_communication_time.isoformat()}. Please give them a warm and friendly welcome back and ask if they are ready to pick up where they left off."
-    else:
-        instructions = f"This is the first learning session of the day for the user, {nickname}. The current time is {now.isoformat()}. Start the conversation with a warm, friendly, and casual greeting that is appropriate for the time of day. Just a simple greeting is enough."
-
-    logger.info(f"instructions: {instructions}")
-    await session.generate_reply(instructions=instructions)

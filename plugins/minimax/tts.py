@@ -29,7 +29,7 @@ from livekit.agents.types import (
     NotGivenOr,
 )
 from livekit.agents.utils import is_given
-from plugins.tokenizer.mixedLanguangeTokenizer import MixedLanguageTokenizer
+from plugins.tokenizer.mixedLanguageTokenizer import MixedLanguageTokenizer
 from .log import logger
 from .models import (
     TTSEncoding,

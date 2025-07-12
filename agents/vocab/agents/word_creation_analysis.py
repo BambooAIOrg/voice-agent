@@ -40,13 +40,14 @@ class WordCreationAnalysisAgent(Agent):
         logger.info(f"llm_node: {chat_ctx.to_dict()}")
         # 调用父类的默认实现
         return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+    
     @function_tool
     async def transfer_to_main_schedule_agent(
         self,
         context: RunContext[AgentContext],
     ):
         """Call this function ONLY after interactively discussing origin, root, and affixes in Chinese."""
-        from agents.vocab.agents.cooccurrence import CooccurrenceAgent
+        from agents.vocab.agents.co_occurrence import CoOccurrenceAgent
         from agents.vocab.agents.synonym import SynonymAgent
         similar_words = self.context.word.similar_words
 
@@ -56,5 +57,5 @@ class WordCreationAnalysisAgent(Agent):
             agent = SynonymAgent(context=context.userdata)
             return agent, None
         else:
-            agent = CooccurrenceAgent(context=context.userdata)
+            agent = CoOccurrenceAgent(context=context.userdata)
             return agent, None
