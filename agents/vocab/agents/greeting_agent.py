@@ -6,13 +6,13 @@ from livekit.agents.llm import function_tool
 import pytz
 
 from agents.vocab.context import AgentContext
-from agents.vocab.base_agent import BaseVocabAgent
 from bamboo_shared.logger import get_logger
+from livekit.agents import Agent as LivekitAgent
 
 logger = get_logger(__name__)
 
 
-class GreetingAgent(BaseVocabAgent):
+class GreetingAgent(LivekitAgent):
     def __init__(self, context: AgentContext) -> None:
         nickname = context.user_info.nick_name
 
@@ -37,7 +37,6 @@ class GreetingAgent(BaseVocabAgent):
 
         logger.info(f"instructions: {instructions}")
         super().__init__(
-            context=context,
             instructions=instructions,
         )
 

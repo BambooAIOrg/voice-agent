@@ -3,15 +3,14 @@ from livekit.agents import (
 )
 from livekit.agents.llm import function_tool
 from agents.vocab.context import AgentContext
-from agents.vocab.base_agent import BaseVocabAgent
 from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
 from bamboo_shared.logger import get_logger
-
+from livekit.agents import Agent as LivekitAgent
 
 logger = get_logger(__name__)
 
 
-class RouteAnalysisAgent(BaseVocabAgent):
+class RouteAnalysisAgent(LivekitAgent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word.word,
@@ -28,7 +27,6 @@ class RouteAnalysisAgent(BaseVocabAgent):
             voice_mode=True
         )
         super().__init__(
-            context=context,
             instructions=instructions,
             chat_ctx=context.chat_context
         )

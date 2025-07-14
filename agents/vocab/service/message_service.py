@@ -9,19 +9,39 @@ from bamboo_shared.service.vocabulary import VocabPlanService
 import uuid
 
 class MessageService:
-    def __init__(self, user_id: int, chat_id: str):
+    def __init__(self, user_id: int, chat_history: Sequence[ChatMessage], chat_id: str, current_node: str | None = None):
         self.user_id = user_id
+        self.chat_history = chat_history
         self.chat_id = chat_id
         self.chat_repo = ChatRepository(user_id)
-        self.current_parent_message_id: str | None = None
+        self.current_node = current_node
 
-    async def get_chat_context_and_phase(self) -> tuple[ChatContext, VocabularyPhase, datetime | None]:
+    @classmethod
+    async def create(cls, user_id: int) -> "MessageService":
+        chat_repo = ChatRepository(user_id)
         vocab_service = VocabPlanService()
-        chat_id_list = await vocab_service.get_current_group_chat_ids(self.user_id)
-        conversation_thread_msgs = await self.chat_repo.get_chat_messages_by_chat_ids(chat_id_list)
+        chat_id_list = await vocab_service.get_current_group_chat_ids(user_id)
+        chat_history = await chat_repo.get_chat_messages_by_chat_ids(chat_id_list)
+
+        if not chat_history or len(chat_history) == 0 or len(chat_id_list) == 0:
+            chat_id = str(uuid.uuid4())
+            return cls(user_id, [], chat_id, None)
+        else:
+            chat_id = chat_history[-1].chat_id
+            chat = await chat_repo.get_by_id(chat_id)
+            if not chat:
+                raise ValueError("Chat not found")
+
+            current_node = chat.current_node
+            if not current_node:
+                current_node = chat_history[-1].id
+
+            return cls(user_id, chat_history, chat_id, current_node)
+    
+    async def get_chat_context(self) -> ChatContext:
         chat_context_items: list[ChatItem] = []
 
-        for msg in conversation_thread_msgs:
+        for msg in self.chat_history:
             if msg.meta_data.get("is_transition"):
                 continue
 
@@ -53,18 +73,19 @@ class MessageService:
                     created_at=msg.create_time.timestamp(),
                 ))
 
-        phase = conversation_thread_msgs[-1].meta_data.get("phase") if conversation_thread_msgs else VocabularyPhase.WORD_CREATION_LOGIC.value
-        last_communication_time = conversation_thread_msgs[-1].create_time if conversation_thread_msgs else None
+        return ChatContext(items=chat_context_items)
+
+    async def get_phase(self) -> VocabularyPhase:
+        if not self.chat_history or len(self.chat_history) == 0:
+            return VocabularyPhase.WORD_CREATION_LOGIC
         
-        # Set current parent message ID to the last message for message threading
-        if conversation_thread_msgs:
-            self.current_parent_message_id = conversation_thread_msgs[-1].id
+        return VocabularyPhase(self.chat_history[-1].meta_data.get("phase"))
+
+    async def get_last_communication_time(self) -> datetime | None:
+        if not self.chat_history or len(self.chat_history) == 0:
+            return None
         
-        logger.info(f"conversation_thread_msgs: {conversation_thread_msgs}")
-        logger.info(f"current_parent_message_id: {self.current_parent_message_id}")
-        logger.info(f"last_communication_time: {last_communication_time}")
-        logger.info(f"chat_context_items: {chat_context_items}")
-        return ChatContext(items=chat_context_items), VocabularyPhase(phase), last_communication_time
+        return self.chat_history[-1].create_time
 
     async def save_user_message(self, content: str, visitor_id: str | None = None) -> str:
         """Save a user message to the database and return the message ID."""
@@ -74,7 +95,7 @@ class MessageService:
             id=message_id,
             user_id=self.user_id,
             visitor_id=visitor_id,
-            parent_message_id=self.current_parent_message_id,
+            parent_message_id=self.current_node,
             chat_id=self.chat_id,
             model="",
             type="message",
@@ -86,7 +107,8 @@ class MessageService:
         )
         
         await self.chat_repo.save_messages([message])
-        self.current_parent_message_id = message_id
+        await self.chat_repo.update_chat_current_node(message_id, self.chat_id)
+        self.current_node = message_id
         return message_id
 
     async def save_assistant_message(self, content: str, phase: VocabularyPhase | None = None, meta_data: dict | None = None) -> str:
@@ -101,7 +123,7 @@ class MessageService:
             id=message_id,
             user_id=self.user_id,
             visitor_id=None,
-            parent_message_id=self.current_parent_message_id,
+            parent_message_id=self.current_node,
             chat_id=self.chat_id,
             model="openai",
             type="message",
@@ -113,7 +135,8 @@ class MessageService:
         )
         
         await self.chat_repo.save_messages([message])
-        self.current_parent_message_id = message_id
+        await self.chat_repo.update_chat_current_node(message_id, self.chat_id)
+        self.current_node = message_id
         return message_id
 
     async def save_function_call_message(self, function_call: FunctionCall) -> str:
@@ -124,7 +147,7 @@ class MessageService:
             id=message_id,
             user_id=self.user_id,
             visitor_id=None,
-            parent_message_id=self.current_parent_message_id,
+            parent_message_id=self.current_node,
             chat_id=self.chat_id,
             model="openai",
             type="function_call",
@@ -142,7 +165,8 @@ class MessageService:
         )
         
         await self.chat_repo.save_messages([message])
-        self.current_parent_message_id = message_id
+        await self.chat_repo.update_chat_current_node(message_id, self.chat_id)
+        self.current_node = message_id
         return message_id
 
     async def save_function_output_message(self, function_output: FunctionCallOutput) -> str:
@@ -153,7 +177,7 @@ class MessageService:
             id=message_id,
             user_id=self.user_id,
             visitor_id=None,
-            parent_message_id=self.current_parent_message_id,
+            parent_message_id=self.current_node,
             chat_id=self.chat_id,
             model="",
             type="function_call_output",
@@ -172,11 +196,6 @@ class MessageService:
         )
         
         await self.chat_repo.save_messages([message])
-        self.current_parent_message_id = message_id
+        await self.chat_repo.update_chat_current_node(message_id, self.chat_id)
+        self.current_node = message_id
         return message_id
-
-    async def save_messages_batch(self, messages: Sequence[ChatMessage]) -> None:
-        """Save multiple messages to the database in a batch."""
-        await self.chat_repo.save_messages(messages)
-        if messages:
-            self.current_parent_message_id = messages[-1].id

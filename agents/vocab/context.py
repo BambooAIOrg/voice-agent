@@ -178,7 +178,6 @@ class AgentContext(Context):
         self.chat_repo = ChatRepository(user_id)
         self.word_repo = VocabularyRepository(user_id)
         self.user_repo = UserRepository(user_id)
-        self.web_content_repo = VocabularyWebContentRepository(user_id, chat_id)
         self.english_level = UserEnglishLevel(
             listening=EnglishLevel.A1,
             reading=EnglishLevel.A1,
@@ -192,15 +191,13 @@ class AgentContext(Context):
             self._initialize_chat_context(),
             self._initialize_user_info(),
             self._initialize_chat_reference(),
-            self._initialize_web_content(),
             self._initialize_word_task()
         )
 
     async def _initialize_chat_context(self):
-        chat_context, phase, last_communication_time = await self.message_service.get_chat_context_and_phase()
-        self.chat_context = chat_context
-        self.phase = phase
-        self.last_communication_time = last_communication_time
+        self.chat_context = await self.message_service.get_chat_context()
+        self.phase = await self.message_service.get_phase()
+        self.last_communication_time = await self.message_service.get_last_communication_time()
 
     async def _initialize_user_info(self):
         user = await self.user_repo.get_by_id(self.user_id)
@@ -222,9 +219,6 @@ class AgentContext(Context):
         )
         self.chat_reference = chat_reference
 
-    async def _initialize_web_content(self):
-        web_content = await self.web_content_repo.get_web_content(self.word_id)
-        self.web_content = web_content
 
     async def _initialize_word_task(self):
         service = VocabPlanService()

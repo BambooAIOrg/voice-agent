@@ -8,9 +8,7 @@ from agents.vocab.context import AgentContext
 logger = get_logger(__name__)
 
 class EventService:
-    def __init__(self, user_id: int, chat_id: str, context: AgentContext, session: AgentSession):
-        self.user_id = user_id
-        self.chat_id = chat_id
+    def __init__(self, context: AgentContext, session: AgentSession):
         self.context = context
         self.session = session
         self.message_service = context.message_service

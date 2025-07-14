@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 from agents.vocab.context import AgentContext
 from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
-from agents.vocab.agents.greeting_agent import GreetingAgent
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
@@ -20,15 +19,11 @@ from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 from bamboo_shared.logger import get_logger
-from livekit.agents.llm import ChatMessage as LivekitChatMessage
-from livekit.agents import ConversationItemAddedEvent, FunctionToolsExecutedEvent
 from agents.vocab.service.event_service import EventService
 from agents.vocab.service.message_service import MessageService
+from agents.vocab.agents.greeting_agent import GreetingAgent
 
 logger = get_logger(__name__)
-
-# Import GreetingAgent from the agents module
-# from agents.vocab.agents.greeting import GreetingAgent
 
 @dataclass
 class WordLearningData:
@@ -39,23 +34,14 @@ class WordLearningData:
     practice_finished: bool = False
 
 
-
-# Function to get the current job context (replace if needed)
-# def get_job_context() -> JobContext:
-#     # This function needs to be implemented or imported correctly
-#     # based on how JobContext is managed in your setup.
-#     # For now, it's a placeholder.
-#     pass
-
 async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     """Entrypoint for vocabulary learning agents"""
     word_id = metadata.get("word_id", 0)
-    chat_id = metadata.get("chat_id", "")
     user_id = metadata.get("user_id", 0)
-    message_service = MessageService(user_id, chat_id)
+    message_service = await MessageService.create(user_id)
     context = AgentContext(
         user_id=int(user_id),
-        chat_id=chat_id,
+        chat_id=message_service.chat_id,
         word_id=int(word_id),
         message_service=message_service
     )
@@ -84,7 +70,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         # ),
         userdata=context,
     )
-    event_service = EventService(user_id, chat_id, context, session)
+    event_service = EventService(context, session)
     event_service.init_event_handlers()
 
     usage_collector = metrics.UsageCollector()
