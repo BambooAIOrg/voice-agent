@@ -20,7 +20,10 @@ from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 from bamboo_shared.logger import get_logger
-
+from livekit.agents.llm import ChatMessage as LivekitChatMessage
+from livekit.agents import ConversationItemAddedEvent, FunctionToolsExecutedEvent
+from agents.vocab.service.event_service import EventService
+from agents.vocab.service.message_service import MessageService
 
 logger = get_logger(__name__)
 
@@ -49,11 +52,12 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     word_id = metadata.get("word_id", 0)
     chat_id = metadata.get("chat_id", "")
     user_id = metadata.get("user_id", 0)
-    
+    message_service = MessageService(user_id, chat_id)
     context = AgentContext(
         user_id=int(user_id),
         chat_id=chat_id,
-        word_id=int(word_id)
+        word_id=int(word_id),
+        message_service=message_service
     )
     await context.initialize_async_context()
     
@@ -80,6 +84,8 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         # ),
         userdata=context,
     )
+    event_service = EventService(user_id, chat_id, context, session)
+    event_service.init_event_handlers()
 
     usage_collector = metrics.UsageCollector()
 
@@ -87,6 +93,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     def _on_metrics_collected(ev: MetricsCollectedEvent):
         metrics.log_metrics(ev.metrics)
         usage_collector.collect(ev.metrics)
+
 
     async def log_usage():
         summary = usage_collector.get_summary()

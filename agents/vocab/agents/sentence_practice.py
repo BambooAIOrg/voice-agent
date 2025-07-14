@@ -1,16 +1,15 @@
 from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
 from livekit.agents import (
-    Agent,
     RunContext,
 )
 from livekit.agents.llm import function_tool
 from agents.vocab.context import AgentContext
+from agents.vocab.base_agent import BaseVocabAgent
 from bamboo_shared.logger import get_logger
-from agents.vocab.agents.route_analysis import RouteAnalysisAgent
 
 logger = get_logger(__name__)
 
-class SentencePracticeAgent(Agent):
+class SentencePracticeAgent(BaseVocabAgent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,
@@ -24,10 +23,10 @@ class SentencePracticeAgent(Agent):
             voice_mode=True
         )
         super().__init__(
+            context=context,
             instructions=instructions,
             chat_ctx=context.chat_context
         )
-        self.context = context
 
     async def on_enter(self):
         await self.session.generate_reply(
@@ -40,6 +39,7 @@ class SentencePracticeAgent(Agent):
         context: RunContext[AgentContext],
     ):
         """Call this function when the student confirms they are ready to start learning about etymology."""
+        from agents.vocab.agents.route_analysis import RouteAnalysisAgent
         logger.info("Handing off to EtymologyAgent.")
         context.userdata.chat_context = context.session._chat_ctx
         agent = RouteAnalysisAgent(context=context.userdata)

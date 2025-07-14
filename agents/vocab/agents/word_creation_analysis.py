@@ -1,17 +1,18 @@
 from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
 from livekit.agents import (
-    Agent,
     RunContext,
 )
 from livekit.agents.llm import function_tool, ChatContext
 
 from agents.vocab.context import AgentContext
+from agents.vocab.base_agent import BaseVocabAgent
 from bamboo_shared.logger import get_logger
+from livekit.agents import Agent as LivekitAgent
 
 logger = get_logger(__name__)
 
 # Placeholder for the next agent - will be implemented next
-class WordCreationAnalysisAgent(Agent):
+class WordCreationAnalysisAgent(BaseVocabAgent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word.word,
@@ -25,6 +26,7 @@ class WordCreationAnalysisAgent(Agent):
             voice_mode=True
         )
         super().__init__(
+            context=context,
             instructions=instructions,
             chat_ctx=context.chat_context
         )
@@ -39,7 +41,7 @@ class WordCreationAnalysisAgent(Agent):
     async def llm_node(self, chat_ctx: ChatContext, tools, model_settings):
         logger.info(f"llm_node: {chat_ctx.to_dict()}")
         # 调用父类的默认实现
-        return Agent.default.llm_node(self, chat_ctx, tools, model_settings)
+        return LivekitAgent.default.llm_node(self, chat_ctx, tools, model_settings)
     
     @function_tool
     async def transfer_to_main_schedule_agent(

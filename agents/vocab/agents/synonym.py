@@ -1,17 +1,16 @@
 from livekit.agents import (
-    Agent,
     RunContext,
 )
 from livekit.agents.llm import function_tool, ChatContext
-from agents.vocab.agents.co_occurrence import CoOccurrenceAgent
 from agents.vocab.context import AgentContext
+from agents.vocab.base_agent import BaseVocabAgent
 from bamboo_shared.agent.instructions import TemplateVariables, get_instructions
 from bamboo_shared.logger import get_logger
 
 
 logger = get_logger(__name__)
 
-class SynonymAgent(Agent):
+class SynonymAgent(BaseVocabAgent):
     def __init__(self, context: AgentContext) -> None:
         self.template_variables = TemplateVariables(
             word=context.word,
@@ -25,6 +24,7 @@ class SynonymAgent(Agent):
             voice_mode=True
         )
         super().__init__(
+            context=context,
             instructions=instructions,
             chat_ctx=context.chat_context
         )
@@ -42,6 +42,7 @@ class SynonymAgent(Agent):
         context: RunContext[AgentContext],
     ):
         """Call this function ONLY after interactively discussing the main synonyms and differences."""
+        from agents.vocab.agents.co_occurrence import CoOccurrenceAgent
         logger.info("Handing off to CoOccurrenceAgent after completing synonym discussion.")
         co_occurrence_agent = CoOccurrenceAgent(context=context.userdata)
         return co_occurrence_agent, None

@@ -170,10 +170,11 @@ class Context:
 
 
 class AgentContext(Context):
-    def __init__(self, chat_id: str, user_id: int, word_id: int):
+    def __init__(self, chat_id: str, user_id: int, word_id: int, message_service: MessageService):
         self.chat_id = chat_id
         self.user_id = user_id
         self.word_id = word_id
+        self.message_service = message_service
         self.chat_repo = ChatRepository(user_id)
         self.word_repo = VocabularyRepository(user_id)
         self.user_repo = UserRepository(user_id)
@@ -196,8 +197,7 @@ class AgentContext(Context):
         )
 
     async def _initialize_chat_context(self):
-        message_service = MessageService(self.user_id, self.chat_id)
-        chat_context, phase, last_communication_time = await message_service.get_chat_context_and_phase()
+        chat_context, phase, last_communication_time = await self.message_service.get_chat_context_and_phase()
         self.chat_context = chat_context
         self.phase = phase
         self.last_communication_time = last_communication_time

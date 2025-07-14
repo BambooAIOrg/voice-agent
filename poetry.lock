@@ -1916,14 +1916,14 @@ types-protobuf = ">=3"
 
 [[package]]
 name = "livekit-agents"
-version = "1.1.5"
+version = "1.1.6"
 description = "A powerful framework for building realtime voice AI agents"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "livekit_agents-1.1.5-py3-none-any.whl", hash = "sha256:cccb79fc9e4cbaede529bb83dcbd8e6ce531baeaaddbcdc541f6955fafa693d2"},
-    {file = "livekit_agents-1.1.5.tar.gz", hash = "sha256:e0f7850cbf99f91e2edaf4f1c8423ef526b56696f63fdc0efdde5e0469ba846b"},
+    {file = "livekit_agents-1.1.6-py3-none-any.whl", hash = "sha256:b892b9bdc7e758b013fd8da0a331532268447285082b5e4cd522ded65fa57a0d"},
+    {file = "livekit_agents-1.1.6.tar.gz", hash = "sha256:6811c6a7a3f1cfc48148df729d5cacc5be6a00538c23a547b78ca67c10d8fd49"},
 ]
 
 [package.dependencies]
@@ -1949,42 +1949,42 @@ typing-extensions = ">=4.12"
 watchfiles = ">=1.0"
 
 [package.extras]
-anthropic = ["livekit-plugins-anthropic (>=1.1.5)"]
-assemblyai = ["livekit-plugins-assemblyai (>=1.1.5)"]
-aws = ["livekit-plugins-aws (>=1.1.5)"]
-azure = ["livekit-plugins-azure (>=1.1.5)"]
-baseten = ["livekit-plugins-baseten (>=1.1.5)"]
-bey = ["livekit-plugins-bey (>=1.1.5)"]
-bithuman = ["livekit-plugins-bithuman (>=1.1.5)"]
-cartesia = ["livekit-plugins-cartesia (>=1.1.5)"]
-clova = ["livekit-plugins-clova (>=1.1.5)"]
+anthropic = ["livekit-plugins-anthropic (>=1.1.6)"]
+assemblyai = ["livekit-plugins-assemblyai (>=1.1.6)"]
+aws = ["livekit-plugins-aws (>=1.1.6)"]
+azure = ["livekit-plugins-azure (>=1.1.6)"]
+baseten = ["livekit-plugins-baseten (>=1.1.6)"]
+bey = ["livekit-plugins-bey (>=1.1.6)"]
+bithuman = ["livekit-plugins-bithuman (>=1.1.6)"]
+cartesia = ["livekit-plugins-cartesia (>=1.1.6)"]
+clova = ["livekit-plugins-clova (>=1.1.6)"]
 codecs = ["av (>=12.0.0)", "numpy (>=1.26.0)"]
-deepgram = ["livekit-plugins-deepgram (>=1.1.5)"]
-elevenlabs = ["livekit-plugins-elevenlabs (>=1.1.5)"]
-fal = ["livekit-plugins-fal (>=1.1.5)"]
-gladia = ["livekit-plugins-gladia (>=1.1.5)"]
-google = ["livekit-plugins-google (>=1.1.5)"]
-groq = ["livekit-plugins-groq (>=1.1.5)"]
-hedra = ["livekit-plugins-hedra (>=1.1.5)"]
-hume = ["livekit-plugins-hume (>=1.1.5)"]
+deepgram = ["livekit-plugins-deepgram (>=1.1.6)"]
+elevenlabs = ["livekit-plugins-elevenlabs (>=1.1.6)"]
+fal = ["livekit-plugins-fal (>=1.1.6)"]
+gladia = ["livekit-plugins-gladia (>=1.1.6)"]
+google = ["livekit-plugins-google (>=1.1.6)"]
+groq = ["livekit-plugins-groq (>=1.1.6)"]
+hedra = ["livekit-plugins-hedra (>=1.1.6)"]
+hume = ["livekit-plugins-hume (>=1.1.6)"]
 images = ["pillow (>=10.3.0)"]
-inworld = ["livekit-plugins-inworld (>=1.1.5)"]
-langchain = ["livekit-plugins-langchain (>=1.1.5)"]
-lmnt = ["livekit-plugins-lmnt (>=1.1.5)"]
+inworld = ["livekit-plugins-inworld (>=1.1.6)"]
+langchain = ["livekit-plugins-langchain (>=1.1.6)"]
+lmnt = ["livekit-plugins-lmnt (>=1.1.6)"]
 mcp = ["mcp (>=1.6.0,<2) ; python_version >= \"3.10\""]
-neuphonic = ["livekit-plugins-neuphonic (>=1.1.5)"]
-nltk = ["livekit-plugins-nltk (>=1.1.5)"]
-openai = ["livekit-plugins-openai (>=1.1.5)"]
-playai = ["livekit-plugins-playai (>=1.1.5)"]
-resemble = ["livekit-plugins-resemble (>=1.1.5)"]
-rime = ["livekit-plugins-rime (>=1.1.5)"]
-sarvam = ["livekit-plugins-sarvam (>=1.1.5)"]
-silero = ["livekit-plugins-silero (>=1.1.5)"]
-speechify = ["livekit-plugins-speechify (>=1.1.5)"]
-speechmatics = ["livekit-plugins-speechmatics (>=1.1.5)"]
-spitch = ["livekit-plugins-spitch (>=1.1.5)"]
-tavus = ["livekit-plugins-tavus (>=1.1.5)"]
-turn-detector = ["livekit-plugins-turn-detector (>=1.1.5)"]
+neuphonic = ["livekit-plugins-neuphonic (>=1.1.6)"]
+nltk = ["livekit-plugins-nltk (>=1.1.6)"]
+openai = ["livekit-plugins-openai (>=1.1.6)"]
+playai = ["livekit-plugins-playai (>=1.1.6)"]
+resemble = ["livekit-plugins-resemble (>=1.1.6)"]
+rime = ["livekit-plugins-rime (>=1.1.6)"]
+sarvam = ["livekit-plugins-sarvam (>=1.1.6)"]
+silero = ["livekit-plugins-silero (>=1.1.6)"]
+speechify = ["livekit-plugins-speechify (>=1.1.6)"]
+speechmatics = ["livekit-plugins-speechmatics (>=1.1.6)"]
+spitch = ["livekit-plugins-spitch (>=1.1.6)"]
+tavus = ["livekit-plugins-tavus (>=1.1.6)"]
+turn-detector = ["livekit-plugins-turn-detector (>=1.1.6)"]
 
 [[package]]
 name = "livekit-api"
@@ -4372,4 +4372,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "a6244b15ee17a5c8c0d3c586a3c5a186adf9ebac7642dce2f0a1647e6dc68ce0"
+content-hash = "1677a95b4a891506e79d64a42e022e36d7824064b686c35b76dd3129eacb9c15"

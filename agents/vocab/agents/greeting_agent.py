@@ -1,18 +1,18 @@
 from datetime import datetime
 from livekit.agents import (
-    Agent,
     RunContext,
 )
 from livekit.agents.llm import function_tool
 import pytz
 
 from agents.vocab.context import AgentContext
+from agents.vocab.base_agent import BaseVocabAgent
 from bamboo_shared.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-class GreetingAgent(Agent):
+class GreetingAgent(BaseVocabAgent):
     def __init__(self, context: AgentContext) -> None:
         nickname = context.user_info.nick_name
 
@@ -21,23 +21,30 @@ class GreetingAgent(Agent):
         now = datetime.now(beijing_tz)
 
         last_communication_time = context.last_communication_time
-        instructions = ''
         if last_communication_time:
-            instructions = f"The user, {nickname}, has returned to continue their learning session. Their last interaction was at {last_communication_time.isoformat()}. Please give the user welcome back and ask if they are ready to pick up where they left off."
-        else:
-            instructions = f"This is the first learning session of the day for the user {nickname}. The current time is {now.isoformat()}. Greeting with the user. Just a simple greeting is enough."
+            instructions = f"""
+            Give a casual, friendly greeting to {nickname} who just came back. Be like a friend or a foreigner english teacher, not an assistant. Keep it simple and natural. Just one short sentence.
 
-        instructions += """
-            \n\nAfter the greeting, call the start_learning to start the learning session.
-        """
+            Here are some information to you for reference: 
+            last interaction was at {last_communication_time.isoformat()}, current time is {now.isoformat()}.
+            """
+        else:
+            instructions = f"""
+            Give a casual, friendly greeting to {nickname}. Be like a friend, not an assistant. Keep it simple and natural. Just one short sentence.
+
+            Here are some information to you for reference: this is the first learning session of the day, current time is {now.isoformat()}.
+            """
 
         logger.info(f"instructions: {instructions}")
         super().__init__(
+            context=context,
             instructions=instructions,
         )
-        self.context = context
 
     async def on_enter(self):
+        logger.info("GreetingAgent on_enter")
+        # await super().on_enter()
+        logger.info("GreetingAgent on_enter after super")
         await self.session.generate_reply()
 
     @function_tool
