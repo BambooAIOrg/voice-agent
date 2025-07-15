@@ -1,11 +1,15 @@
 from dotenv import load_dotenv
 from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
+from bamboo_shared.nacos import get_nacos_client
+from bamboo_shared.logger import get_logger
+import os
+
 load_dotenv(dotenv_path=".env.local")
+logger = get_logger(__name__)
 install_mixed_language_tokenize()
 
 from collections import deque
 import json
-import logging
 import os
 import psutil
 
@@ -16,28 +20,43 @@ from livekit.agents import (
 )
 from livekit.agents.job import JobRequest
 from livekit.plugins import silero
-from bamboo_shared.nacos import get_nacos_client
+
 from agents.entry import entrypoint
 
-logger = logging.getLogger("voice-agent-worker")
+
 
 def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 
 
 async def request_fnc(request: JobRequest):
-    logger.info(f"Received request: {request.room.metadata}")
     logger.info(f"ENV: {os.getenv('ENV')}")
+    logger.info(f"Metadata: {request.room.metadata}")
     if not request.room.metadata:
+        logger.warning("Rejecting request: No metadata provided")
         await request.reject()
         return
 
-    metadata = json.loads(request.room.metadata)
+    try:
+        metadata = json.loads(request.room.metadata)
+    except json.JSONDecodeError as e:
+        logger.error(f"Rejecting request: Invalid JSON metadata - {e}")
+        await request.reject()
+        return
+    
+    # Validate required fields
+    required_fields = ["env", "room_type", "user_id"]
+    missing_fields = [field for field in required_fields if field not in metadata]
+    if missing_fields:
+        logger.error(f"Rejecting request: Missing required fields - {missing_fields}")
+        await request.reject()
+        return
+    
     if metadata.get("env") == os.getenv("ENV"):
-        logger.info(f"Accepting request: {metadata}")
+        logger.info(f"Accepting request for room_type: {metadata.get('room_type')}, user_id: {metadata.get('user_id')}")
         await request.accept(attributes=metadata)
     else:
-        logger.info(f"Rejecting request: {metadata}")
+        logger.info(f"Rejecting request: Environment mismatch - expected {os.getenv('ENV')}, got {metadata.get('env')}")
         await request.reject()
 
 def load_fnc(*args, window_size=120, interval=0.5):

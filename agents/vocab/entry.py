@@ -1,3 +1,4 @@
+from bamboo_shared.enums.vocabulary import VocabularyPhase
 from dotenv import load_dotenv
 from agents.vocab.context import AgentContext
 from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
@@ -18,34 +19,40 @@ from livekit.plugins import openai
 from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
-from bamboo_shared.logger import get_logger
 from agents.vocab.service.event_service import EventService
 from agents.vocab.service.message_service import MessageService
 from agents.vocab.agents.greeting_agent import GreetingAgent
+from bamboo_shared.repositories.chat_reference import ChatReferenceRepository
+from bamboo_shared.repositories.chat import ChatRepository
+from bamboo_shared.logger import get_logger
+from bamboo_shared.service.vocabulary import VocabPlanService
+from bamboo_shared.models.Chat import ChatReference, Chat
+from bamboo_shared.repositories.vocabulary import VocabularyRepository
+import uuid
+import asyncio
+
 
 logger = get_logger(__name__)
-
-@dataclass
-class WordLearningData:
-    target_word: str
-    etymology_explored: bool = False
-    synonyms_explored: bool = False
-    cooccurrence_explored: bool = False
-    practice_finished: bool = False
-
 
 async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     """Entrypoint for vocabulary learning agents"""
     word_id = metadata.get("word_id", 0)
     user_id = metadata.get("user_id", 0)
-    message_service = await MessageService.create(user_id)
+    chat_id = metadata.get("chat_id", None)
+    
+    # Initialize message service and context
     context = AgentContext(
         user_id=int(user_id),
-        chat_id=message_service.chat_id,
+        chat_id=chat_id,
         word_id=int(word_id),
-        message_service=message_service
     )
-    await context.initialize_async_context()
+    # Initialize context with improved error handling
+    try:
+        await context.initialize_async_context()
+    except Exception as e:
+        logger.error(f"Failed to initialize agent context: {e}")
+        ctx.shutdown()
+        return
     
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
@@ -76,7 +83,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     usage_collector = metrics.UsageCollector()
 
     @session.on("metrics_collected")
-    def _on_metrics_collected(ev: MetricsCollectedEvent):
+    def on_metrics_collected(ev: MetricsCollectedEvent):  # Callback function for metrics collection
         metrics.log_metrics(ev.metrics)
         usage_collector.collect(ev.metrics)
 

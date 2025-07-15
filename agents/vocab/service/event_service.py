@@ -11,7 +11,7 @@ class EventService:
     def __init__(self, context: AgentContext, session: AgentSession):
         self.context = context
         self.session = session
-        self.message_service = context.message_service
+        self.message_service = MessageService(self.context.user_id, context)
 
     def init_event_handlers(self):
         @self.session.on("conversation_item_added")
@@ -42,22 +42,29 @@ class EventService:
                 return
             
             if item.role == "user":
-                await self.message_service.save_user_message(text_content)
-                logger.info(f"Saved user message: {text_content[:50]}...")
+                await self.message_service.save_user_message(
+                    content=text_content,
+                    phase=self.context.phase,
+                    meta_data={
+                        "word_id": self.context.word.id,
+                        "word": self.context.word.word,
+                        "phase": self.context.phase,
+                        "interrupted": getattr(item, 'interrupted', False)
+                    }
+                )
                 
             elif item.role == "assistant":
+                logger.info(f"Saving assistant message: {self.context.phase}")
                 await self.message_service.save_assistant_message(
                     content=text_content,
                     phase=self.context.phase,
                     meta_data={
                         "word_id": self.context.word.id,
                         "word": self.context.word.word,
-                        "agent_type": self.__class__.__name__,
+                        "phase": self.context.phase,
                         "interrupted": getattr(item, 'interrupted', False)
                     }
                 )
-                logger.info(f"Saved assistant message: {text_content[:50]}...")
-                
         except Exception as e:
             logger.error(f"Failed to save conversation item: {e}")
     

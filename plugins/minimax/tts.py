@@ -40,6 +40,16 @@ from .models import (
     TTSVoiceSpeed,
 )
 
+
+class TTSAuthenticationError(Exception):
+    """Raised when TTS authentication fails"""
+    pass
+
+
+class TTSConfigurationError(Exception):
+    """Raised when TTS configuration is invalid"""
+    pass
+
 API_KEY_HEADER = "Authorization"
 GROUP_ID_PARAM = "GroupId"
 API_VERSION = "2024-06-10"
@@ -124,20 +134,12 @@ class TTS(tts.TTS):
             sample_rate=sample_rate,
             num_channels=channels,
         )
-        minimax_api_key = api_key if is_given(api_key) else os.environ.get("MINIMAX_API_KEY")
-        if not minimax_api_key:
-            raise ValueError("MINIMAX_API_KEY must be set")
-
-        minimax_group_id = group_id if is_given(group_id) else os.environ.get("MINIMAX_GROUP_ID")
-        if not minimax_group_id:
-            raise ValueError("MINIMAX_GROUP_ID must be set")
-
-        # Strip "Bearer " prefix if it exists
-        if minimax_api_key.startswith("Bearer "):
-            minimax_api_key = minimax_api_key[7:]
-
-        # Ensure the API key is properly formatted with Bearer prefix
-        minimax_api_key = f"Bearer {minimax_api_key}"
+        # Validate and retrieve API credentials
+        minimax_api_key = self._validate_api_key(api_key)
+        minimax_group_id = self._validate_group_id(group_id)
+        
+        # Format API key securely
+        minimax_api_key = self._format_api_key(minimax_api_key)
 
         self._opts = _TTSOptions(
             model=model,
@@ -162,8 +164,51 @@ class TTS(tts.TTS):
             max_session_duration=100,  # Less than Minimax's 120s server timeout
             mark_refreshed_on_get=True,
         )
-        logger.info(f"TTS initialized with connection pool, max_session_duration=100s")
+        logger.info("TTS initialized with connection pool, max_session_duration=100s")
         self._streams = weakref.WeakSet[SynthesizeStream]()
+    
+    def _validate_api_key(self, api_key: NotGivenOr[str]) -> str:
+        """Validate and retrieve API key with proper error handling"""
+        key = api_key if is_given(api_key) else os.environ.get("MINIMAX_API_KEY")
+        
+        if not key:
+            raise TTSConfigurationError(
+                "MINIMAX_API_KEY must be set either as parameter or environment variable"
+            )
+        
+        # Basic validation - ensure it's not empty or placeholder
+        if not key.strip() or key.strip() in ["your_api_key", "placeholder", "test"]:
+            raise TTSAuthenticationError(
+                "Invalid API key format. Please provide a valid Minimax API key."
+            )
+        
+        return key.strip()
+    
+    def _validate_group_id(self, group_id: NotGivenOr[str]) -> str:
+        """Validate and retrieve group ID with proper error handling"""
+        gid = group_id if is_given(group_id) else os.environ.get("MINIMAX_GROUP_ID")
+        
+        if not gid:
+            raise TTSConfigurationError(
+                "MINIMAX_GROUP_ID must be set either as parameter or environment variable"
+            )
+        
+        # Basic validation
+        if not gid.strip():
+            raise TTSAuthenticationError(
+                "Invalid group ID format. Please provide a valid Minimax group ID."
+            )
+        
+        return gid.strip()
+    
+    def _format_api_key(self, api_key: str) -> str:
+        """Format API key with Bearer prefix securely"""
+        # Strip existing Bearer prefix if present
+        if api_key.startswith("Bearer "):
+            api_key = api_key[7:]
+        
+        # Ensure the API key is properly formatted with Bearer prefix
+        return f"Bearer {api_key}"
 
     async def _connect_ws(
         self,
@@ -190,25 +235,25 @@ class TTS(tts.TTS):
         else:
             ws_timeout = getattr(self, "_conn_options", type("_", (), {"timeout": 30.0})()).timeout  # type: ignore[attr-defined]
 
-        logger.debug(f"Connecting to WebSocket: {url} with timeout={ws_timeout}")
+        logger.debug(f"Connecting to WebSocket with timeout={ws_timeout}")
 
         try:
             ws = await asyncio.wait_for(
                 session.ws_connect(url, headers=headers, heartbeat=10.0),
                 timeout=ws_timeout,
             ) 
-            logger.info(f"WebSocket connection established successfully, heartbeat=10.0s")
+            logger.info("WebSocket connection established successfully, heartbeat=10.0s")
         except (asyncio.TimeoutError, aiohttp.ClientConnectionError, OSError) as e:
-            logger.error(f"Failed to connect to WebSocket: {e}")
-            raise APIConnectionError(f"Failed to connect to WebSocket: {e}")
+            logger.error(f"Failed to connect to WebSocket: {type(e).__name__}")
+            raise APIConnectionError(f"Failed to connect to WebSocket: {type(e).__name__}")
 
         logger.debug("WebSocket connection established – sending task_start")
         try:
             await self._start_task(ws)
         except Exception as e:
-            logger.error(f"Failed to start task on WebSocket: {e}")
+            logger.error(f"Failed to start task on WebSocket: {type(e).__name__}")
             await ws.close()
-            raise APIConnectionError(f"Failed to start task on WebSocket: {e}")
+            raise APIConnectionError(f"Failed to start task on WebSocket: {type(e).__name__}")
         return ws
     
     async def _start_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
