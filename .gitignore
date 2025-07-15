@@ -21,3 +21,6 @@ logs/
 *.log.*.*
 *.log.*.*.*
 *.log.*.*.*.*
+
+# Shell configuration files with secrets
+~

@@ -1,14 +1,14 @@
 from datetime import datetime
 from enum import Enum
 from dataclasses import dataclass
-from typing import Any, Dict, List
-from uuid import uuid4
+from typing import Any, Dict, List, Sequence
 from bamboo_shared.models import (
     User,
     Vocabulary,
     VocabularyWebContent,
-    ChatMessage,
     ChatReference,
+    ChatMessage,
+    Chat,
 )
 from bamboo_shared.enums.vocabulary import VocabularyPhase
 from bamboo_shared.repositories import (
@@ -16,16 +16,19 @@ from bamboo_shared.repositories import (
     UserRepository,
     ChatReferenceRepository,
     VocabularyRepository,
-    VocabularyWebContentRepository,
 )
-from bamboo_shared.utils import time_now
 from bamboo_shared.service.vocabulary import WordTask, VocabPlanService
-from agents.vocab.service.message_service import MessageService
 from bamboo_shared.logger import get_logger
-from livekit.agents.llm.chat_context import ChatContext
+from livekit.agents.llm.chat_context import ChatContext, ChatItem, FunctionCall, FunctionCallOutput, ChatMessage as LivekitChatMessage
 import asyncio
+import uuid
 
 logger = get_logger(__name__)
+
+
+class ContextInitializationError(Exception):
+    """Raised when agent context initialization fails"""
+    pass
 
 class EnglishLevel(Enum):
     """CEFR English level enum"""
@@ -117,50 +120,7 @@ class Context:
             "word_id": self.word.id,
             "word": self.word.word,
         }
-
-    async def create_cross_chat_transition_message(
-        self,
-        parent_chat_id: str, 
-        parent_message_id: str, 
-        word: str
-    ) -> ChatMessage:
-        """
-        create cross-chat transition message to connect different word learning sessions
-        Args:
-            parent_chat_id: the ID of the previous chat
-            parent_message_id: the ID of the last message of the previous chat
-            word: the new word to learn
-            
-        Returns:
-            the transition message
-        """
-        message_id = str(uuid4())
-        
-        # create a special system message to connect different chats
-        meta_data = {
-            "is_transition": True,
-            "parent_chat_id": parent_chat_id,
-            "parent_message_id": parent_message_id,
-            "new_word": word,
-            "is_visually_hidden": True
-        }
-        
-        transition_message = ChatMessage(
-            id=message_id,
-            author={"role": "system"},
-            chat_id=self.chat_id,
-            user_id=self.user_info.id,
-            parent_message_id=None,  # this message has no regular parent message
-            content=f"Start learning the new word: {word}",
-            status="finished_successfully",
-            meta_data=meta_data,
-            create_time=time_now()
-        )
-        
-        # save the message
-        await self.chat_repo.save_messages([transition_message])
-        return transition_message
-
+    
     async def go_next_word(self):
         """进入下一个单词的学习"""
         chat_reference_repo = ChatReferenceRepository(self.user_info.id)
@@ -203,12 +163,6 @@ class Context:
             if not prev_chat or not prev_chat.current_node:
                 raise ValueError(f"prev_chat.current_node is None, parent_chat_id: {parent_chat_id} prev_chat: {prev_chat}")
 
-            transition_message = await self.create_cross_chat_transition_message(
-                parent_chat_id=parent_chat_id,
-                parent_message_id=prev_chat.current_node,
-                word=next_word.word
-            )
-            await chat_repo.update_chat_current_node(transition_message.id, chat_id)
             self.word = next_word
             self.phase = VocabularyPhase.WORD_CREATION_LOGIC
             self.chat_reference = await vocab_repo.ensure_word_reference(
@@ -222,14 +176,14 @@ class Context:
 
 
 class AgentContext(Context):
-    def __init__(self, chat_id: str, user_id: int, word_id: int):
-        self.chat_id = chat_id
+    def __init__(self, user_id: int, word_id: int, chat_id: str | None = None):
         self.user_id = user_id
         self.word_id = word_id
+        self.chat_id = chat_id
         self.chat_repo = ChatRepository(user_id)
+        self.chat_reference_repo = ChatReferenceRepository(user_id)
         self.word_repo = VocabularyRepository(user_id)
         self.user_repo = UserRepository(user_id)
-        self.web_content_repo = VocabularyWebContentRepository(user_id, chat_id)
         self.english_level = UserEnglishLevel(
             listening=EnglishLevel.A1,
             reading=EnglishLevel.A1,
@@ -237,48 +191,147 @@ class AgentContext(Context):
             speaking=EnglishLevel.A1
         )
         self.chat_context = None
+        self.chat_history = []
+        self.last_communication_time = None
+        self.current_node = None
+
+    def update_chat_current_node(self, message_id: str):
+        self.current_node = message_id
 
     async def initialize_async_context(self):
-        await asyncio.gather(
-            self._initialize_chat_context(),
-            self._initialize_user_info(),
-            self._initialize_chat_reference(),
-            self._initialize_web_content(),
-            self._initialize_word_task()
-        )
+        """Initialize all async context components with proper error handling"""
+        try:
+            # Initialize word and user info first (they can run in parallel)
+            user_task = asyncio.create_task(self._initialize_user_info())
+            word_task = asyncio.create_task(self._initialize_word_task())
+            
+            await asyncio.gather(user_task, word_task)
+            
+            # Initialize chat context after word is available
+            await self._initialize_chat_context()
+            
+            logger.info("Context initialization completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Unexpected error during context initialization: {e}")
+            raise ContextInitializationError(f"Context initialization failed: {e}") from e
 
     async def _initialize_chat_context(self):
-        message_service = MessageService(self.user_id, self.chat_id)
-        chat_context, phase, last_communication_time = await message_service.get_chat_context_and_phase()
-        self.chat_context = chat_context
-        self.phase = phase
-        self.last_communication_time = last_communication_time
+        if not self.chat_id:
+            self.chat_id = str(uuid.uuid4())
+            chat = await self.chat_repo.create_chat(Chat(
+                id=self.chat_id,
+                user_id=self.user_id,
+                type="vocabulary",
+                title=self.word.word,
+            ))
+            chat_reference = await self.chat_reference_repo.create(ChatReference(
+                user_id=self.user_id,
+                chat_id=self.chat_id,
+                reference_id=self.word_id,
+                reference_type="vocabulary",
+                phase=VocabularyPhase.ANALYSIS_ROUTE.value
+            ))
+            self.phase = VocabularyPhase.ANALYSIS_ROUTE
+        else:
+            chat_reference = await self.word_repo.ensure_word_reference(
+                self.word_id,
+                self.chat_id
+            )
+            vocab_service = VocabPlanService()
+            chat_task = asyncio.create_task(self.chat_repo.get_by_id(chat_reference.chat_id))
+            chat_ids_task = asyncio.create_task(vocab_service.get_current_group_chat_ids(self.user_id))
+            
+            chat, chat_id_list = await asyncio.gather(chat_task, chat_ids_task)
+            
+            if not chat:
+                raise ValueError(f"Chat not found for chat_reference: {chat_reference.id}")
+            
+            # Load chat history
+            chat_history = await self.chat_repo.get_chat_messages_by_chat_ids(chat_id_list)
+            self.chat_context = await self.convert_chat_history_to_chat_context(chat_history)
+            
+            current_message = next((msg for msg in chat_history if msg.id == chat.current_node), None)
+            if not current_message:
+                raise ValueError(f"Current message not found for chat_id: {chat.id}, current_node: {chat.current_node}")
+            
+            self.phase = VocabularyPhase(current_message.meta_data.get("phase"))
+            self.last_communication_time = current_message.create_time
+            self.update_chat_current_node(current_message.id)
 
     async def _initialize_user_info(self):
-        user = await self.user_repo.get_by_id(self.user_id)
-        if not user:
-            raise ValueError(f"user not found, user_id: {self.user_id}")
-        
-        if not user.hobbies:
-            user.hobbies = ""
-        
-        self.user_info = user
-        self.user_characteristics = f"""
-            Hobbies: {user.hobbies}
-        """.strip()
-
-    async def _initialize_chat_reference(self):
-        chat_reference = await self.word_repo.ensure_word_reference(
-            self.word_id,
-            self.chat_id
-        )
-        self.chat_reference = chat_reference
-
-    async def _initialize_web_content(self):
-        web_content = await self.web_content_repo.get_web_content(self.word_id)
-        self.web_content = web_content
+        """Initialize user information with proper error handling"""
+        try:
+            user = await self.user_repo.get_by_id(self.user_id)
+            if not user:
+                raise ValueError(f"User not found, user_id: {self.user_id}")
+            
+            # Ensure hobbies field is not None
+            if not user.hobbies:
+                user.hobbies = ""
+            
+            self.user_info = user
+            self.user_characteristics = f"""
+                Hobbies: {user.hobbies}
+            """.strip()
+            
+            logger.debug(f"User info initialized for user_id: {self.user_id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize user info for user_id {self.user_id}: {e}")
+            raise
 
     async def _initialize_word_task(self):
-        service = VocabPlanService()
-        self.word = await self.word_repo.get_by_id(self.word_id)
-        self.task_list = await service.get_daily_word_task_detail(self.user_id)
+        """Initialize word and task information with proper error handling"""
+        try:
+            # Initialize word first
+            self.word = await self.word_repo.get_by_id(self.word_id)
+            if not self.word:
+                raise ValueError(f"Word not found, word_id: {self.word_id}")
+            
+            # Initialize task list
+            service = VocabPlanService()
+            self.task_list = await service.get_daily_word_task_detail(self.user_id)
+            
+            logger.debug(f"Word task initialized for word_id: {self.word_id}, word: {self.word.word}")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize word task for word_id {self.word_id}, user_id {self.user_id}: {e}")
+            raise
+
+    async def convert_chat_history_to_chat_context(self, chat_history: Sequence[ChatMessage]) -> ChatContext:
+        chat_context_items: list[ChatItem] = []
+
+        for msg in chat_history:
+            if msg.meta_data.get("is_transition"):
+                continue
+
+            if msg.type == "function_call":
+                logger.info(f"msg.content: {msg.content}")
+                chat_context_items.append(FunctionCall(
+                    id=msg.id,
+                    type="function_call",
+                    call_id=msg.content["call_id"],
+                    name=msg.content["function"]["name"],
+                    arguments=msg.content["function"]["arguments"],
+                ))
+            elif msg.type == "function_call_output":
+                chat_context_items.append(FunctionCallOutput(
+                    id=msg.id,
+                    type="function_call_output",
+                    call_id=msg.content["tool_call_id"],
+                    name=msg.content["tool_name"],
+                    output=msg.content["output"],
+                    is_error=True if msg.content["error"] else False,
+                ))
+            elif msg.type == "message" and msg.content is not None:
+                logger.info(f"msg.type: {msg.type}")
+                chat_context_items.append(LivekitChatMessage(
+                    id=msg.id,
+                    type="message",
+                    role=msg.author.get("role"),
+                    content=[msg.content],
+                    created_at=msg.create_time.timestamp(),
+                ))
+
+        return ChatContext(items=chat_context_items)

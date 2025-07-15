@@ -1,14 +1,7 @@
-from datetime import datetime
+from bamboo_shared.enums.vocabulary import VocabularyPhase
 from dotenv import load_dotenv
-import pytz
-from agents.vocab.agents.cooccurrence import CooccurrenceAgent
-from agents.vocab.agents.sentence_practice import SentencePracticeAgent
-from agents.vocab.agents.word_creation_analysis import WordCreationAnalysisAgent
-from agents.vocab.agents.route_analysis import RouteAnalysisAgent
-from agents.vocab.agents.synonym import SynonymAgent
-from agents.vocab.context import AgentContext, VocabularyPhase
-from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
-from bamboo_shared.repositories import VocabularyRepository
+from agents.vocab.context import AgentContext
+from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
@@ -26,43 +19,40 @@ from livekit.plugins import openai
 from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
+from agents.vocab.service.event_service import EventService
+from agents.vocab.service.message_service import MessageService
+from agents.vocab.agents.greeting_agent import GreetingAgent
+from bamboo_shared.repositories.chat_reference import ChatReferenceRepository
+from bamboo_shared.repositories.chat import ChatRepository
 from bamboo_shared.logger import get_logger
+from bamboo_shared.service.vocabulary import VocabPlanService
+from bamboo_shared.models.Chat import ChatReference, Chat
+from bamboo_shared.repositories.vocabulary import VocabularyRepository
+import uuid
+import asyncio
 
 
 logger = get_logger(__name__)
 
-# Import GreetingAgent from the agents module
-# from agents.vocab.agents.greeting import GreetingAgent
-
-@dataclass
-class WordLearningData:
-    target_word: str
-    etymology_explored: bool = False
-    synonyms_explored: bool = False
-    cooccurrence_explored: bool = False
-    practice_finished: bool = False
-
-
-
-# Function to get the current job context (replace if needed)
-# def get_job_context() -> JobContext:
-#     # This function needs to be implemented or imported correctly
-#     # based on how JobContext is managed in your setup.
-#     # For now, it's a placeholder.
-#     pass
-
 async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     """Entrypoint for vocabulary learning agents"""
     word_id = metadata.get("word_id", 0)
-    chat_id = metadata.get("chat_id", "")
     user_id = metadata.get("user_id", 0)
+    chat_id = metadata.get("chat_id", None)
     
+    # Initialize message service and context
     context = AgentContext(
         user_id=int(user_id),
         chat_id=chat_id,
-        word_id=int(word_id)
+        word_id=int(word_id),
     )
-    await context.initialize_async_context()
+    # Initialize context with improved error handling
+    try:
+        await context.initialize_async_context()
+    except Exception as e:
+        logger.error(f"Failed to initialize agent context: {e}")
+        ctx.shutdown()
+        return
     
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
@@ -87,13 +77,16 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         # ),
         userdata=context,
     )
+    event_service = EventService(context, session)
+    event_service.init_event_handlers()
 
     usage_collector = metrics.UsageCollector()
 
     @session.on("metrics_collected")
-    def _on_metrics_collected(ev: MetricsCollectedEvent):
+    def on_metrics_collected(ev: MetricsCollectedEvent):  # Callback function for metrics collection
         metrics.log_metrics(ev.metrics)
         usage_collector.collect(ev.metrics)
+
 
     async def log_usage():
         summary = usage_collector.get_summary()
@@ -103,24 +96,8 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
 
     logger.info(f"session started")
 
-    agent = None
-
-    match context.phase:
-        case VocabularyPhase.ANALYSIS_ROUTE:
-            agent = RouteAnalysisAgent(context=context)
-        case VocabularyPhase.WORD_CREATION_LOGIC:
-            agent = WordCreationAnalysisAgent(context=context)
-        case VocabularyPhase.SYNONYM_DIFFERENTIATION:
-            agent = SynonymAgent(context=context)
-        case VocabularyPhase.CO_OCCURRENCE:
-            agent = CooccurrenceAgent(context=context)
-        case VocabularyPhase.QUESTION_ANSWER:
-            agent = SentencePracticeAgent(context=context)
-        case _:
-            raise ValueError(f"Invalid phase: {context.phase}")
-
     await session.start(
-        agent=agent,
+        agent=GreetingAgent(context=context),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
@@ -131,18 +108,3 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
             audio_enabled=True,
         ),
     )
-
-    nickname = context.user_info.nick_name
-
-    # 获取北京时间
-    beijing_tz = pytz.timezone('Asia/Shanghai')
-    now = datetime.now(beijing_tz)
-
-    last_communication_time = context.last_communication_time
-    instructions = ''
-    if last_communication_time:
-        instructions = f"The user, {nickname}, has returned to continue their learning session. Their last interaction was at {last_communication_time.isoformat()}. Please give them a warm and friendly welcome back and ask if they are ready to pick up where they left off."
-    else:
-        instructions = f"This is the first learning session of the day for the user, {nickname}. The current time is {now.isoformat()}. Start the conversation with a warm, friendly, and casual greeting that is appropriate for the time of day. Just a simple greeting is enough."
-
-    await session.generate_reply(instructions=instructions)

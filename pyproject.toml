@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Multi-agent system using LiveKit"
 authors = ["User"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -22,10 +23,10 @@ azure-cognitiveservices-speech = "^1.43.0"
 aliyun-log-python-sdk = "^0.9.19"
 loguru = "^0.7.3"
 livekit-api = "^1.0.2"
-livekit-agents = "^1.1.5"
 livekit-plugins-cartesia = "^1.0.19"
 nacos-sdk-python = "^2.0.6"
-bamboo-shared = {git = "git@github.com:BambooAIOrg/bamboo-shared.git", branch = "master"}
+livekit-agents = "^1.1.6"
+bamboo-shared = {path="bamboo-shared", develop=true}
 
 [build-system]
 requires = ["poetry-core"]

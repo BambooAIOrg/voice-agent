@@ -29,7 +29,7 @@ from livekit.agents.types import (
     NotGivenOr,
 )
 from livekit.agents.utils import is_given
-from plugins.tokenizer.mixedLanguangeTokenizer import MixedLanguageTokenizer
+from plugins.tokenizer.mixedLanguageTokenizer import MixedLanguageTokenizer
 from .log import logger
 from .models import (
     TTSEncoding,
@@ -39,6 +39,16 @@ from .models import (
     TTSVoiceEmotion,
     TTSVoiceSpeed,
 )
+
+
+class TTSAuthenticationError(Exception):
+    """Raised when TTS authentication fails"""
+    pass
+
+
+class TTSConfigurationError(Exception):
+    """Raised when TTS configuration is invalid"""
+    pass
 
 API_KEY_HEADER = "Authorization"
 GROUP_ID_PARAM = "GroupId"
@@ -124,20 +134,12 @@ class TTS(tts.TTS):
             sample_rate=sample_rate,
             num_channels=channels,
         )
-        minimax_api_key = api_key if is_given(api_key) else os.environ.get("MINIMAX_API_KEY")
-        if not minimax_api_key:
-            raise ValueError("MINIMAX_API_KEY must be set")
-
-        minimax_group_id = group_id if is_given(group_id) else os.environ.get("MINIMAX_GROUP_ID")
-        if not minimax_group_id:
-            raise ValueError("MINIMAX_GROUP_ID must be set")
-
-        # Strip "Bearer " prefix if it exists
-        if minimax_api_key.startswith("Bearer "):
-            minimax_api_key = minimax_api_key[7:]
-
-        # Ensure the API key is properly formatted with Bearer prefix
-        minimax_api_key = f"Bearer {minimax_api_key}"
+        # Validate and retrieve API credentials
+        minimax_api_key = self._validate_api_key(api_key)
+        minimax_group_id = self._validate_group_id(group_id)
+        
+        # Format API key securely
+        minimax_api_key = self._format_api_key(minimax_api_key)
 
         self._opts = _TTSOptions(
             model=model,
@@ -162,7 +164,51 @@ class TTS(tts.TTS):
             max_session_duration=100,  # Less than Minimax's 120s server timeout
             mark_refreshed_on_get=True,
         )
+        logger.info("TTS initialized with connection pool, max_session_duration=100s")
         self._streams = weakref.WeakSet[SynthesizeStream]()
+    
+    def _validate_api_key(self, api_key: NotGivenOr[str]) -> str:
+        """Validate and retrieve API key with proper error handling"""
+        key = api_key if is_given(api_key) else os.environ.get("MINIMAX_API_KEY")
+        
+        if not key:
+            raise TTSConfigurationError(
+                "MINIMAX_API_KEY must be set either as parameter or environment variable"
+            )
+        
+        # Basic validation - ensure it's not empty or placeholder
+        if not key.strip() or key.strip() in ["your_api_key", "placeholder", "test"]:
+            raise TTSAuthenticationError(
+                "Invalid API key format. Please provide a valid Minimax API key."
+            )
+        
+        return key.strip()
+    
+    def _validate_group_id(self, group_id: NotGivenOr[str]) -> str:
+        """Validate and retrieve group ID with proper error handling"""
+        gid = group_id if is_given(group_id) else os.environ.get("MINIMAX_GROUP_ID")
+        
+        if not gid:
+            raise TTSConfigurationError(
+                "MINIMAX_GROUP_ID must be set either as parameter or environment variable"
+            )
+        
+        # Basic validation
+        if not gid.strip():
+            raise TTSAuthenticationError(
+                "Invalid group ID format. Please provide a valid Minimax group ID."
+            )
+        
+        return gid.strip()
+    
+    def _format_api_key(self, api_key: str) -> str:
+        """Format API key with Bearer prefix securely"""
+        # Strip existing Bearer prefix if present
+        if api_key.startswith("Bearer "):
+            api_key = api_key[7:]
+        
+        # Ensure the API key is properly formatted with Bearer prefix
+        return f"Bearer {api_key}"
 
     async def _connect_ws(
         self,
@@ -189,15 +235,25 @@ class TTS(tts.TTS):
         else:
             ws_timeout = getattr(self, "_conn_options", type("_", (), {"timeout": 30.0})()).timeout  # type: ignore[attr-defined]
 
-        logger.debug(f"Connecting to WebSocket: {url} with timeout={ws_timeout}")
+        logger.debug(f"Connecting to WebSocket with timeout={ws_timeout}")
 
-        ws = await asyncio.wait_for(
-            session.ws_connect(url, headers=headers, heartbeat=30.0),
-            timeout=ws_timeout,
-        )
+        try:
+            ws = await asyncio.wait_for(
+                session.ws_connect(url, headers=headers, heartbeat=10.0),
+                timeout=ws_timeout,
+            ) 
+            logger.info("WebSocket connection established successfully, heartbeat=10.0s")
+        except (asyncio.TimeoutError, aiohttp.ClientConnectionError, OSError) as e:
+            logger.error(f"Failed to connect to WebSocket: {type(e).__name__}")
+            raise APIConnectionError(f"Failed to connect to WebSocket: {type(e).__name__}")
 
         logger.debug("WebSocket connection established – sending task_start")
-        await self._start_task(ws)
+        try:
+            await self._start_task(ws)
+        except Exception as e:
+            logger.error(f"Failed to start task on WebSocket: {type(e).__name__}")
+            await ws.close()
+            raise APIConnectionError(f"Failed to start task on WebSocket: {type(e).__name__}")
         return ws
     
     async def _start_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
@@ -219,10 +275,16 @@ class TTS(tts.TTS):
             }
         }
         logger.debug(f"Sending task_start message: {start_msg}")
-        await ws.send_json(start_msg)
+        try:
+            await ws.send_json(start_msg)
+        except (aiohttp.ClientConnectionError, ConnectionResetError) as e:
+            logger.error(f"Failed to send task_start message: {e}")
+            raise APIConnectionError(f"Failed to send task_start message: {e}")
         
     async def _close_ws(self, ws: aiohttp.ClientWebSocketResponse) -> None:
+        logger.info(f"Closing WebSocket connection, current state: closed={ws.closed}")
         await ws.close()
+        logger.info("WebSocket connection closed")
 
     def _ensure_session(self) -> aiohttp.ClientSession:
         if not self._session:
@@ -330,6 +392,7 @@ class SynthesizeStream(tts.SynthesizeStream):
         self._pending_tasks_count = 0
         self._pending_tasks_lock = asyncio.Lock()
         self._tokenizer_finished = False
+        self._tokenizer_stream_closed = False
 
     # ---------------------------------------------------------------------
     # Core run-loop required by livekit.agents.tts.SynthesizeStream
@@ -357,7 +420,15 @@ class SynthesizeStream(tts.SynthesizeStream):
         output_emitter.start_segment(segment_id="0")
 
         # Obtain WebSocket connection from pool (respect timeout settings)
+        logger.debug(f"[{self._request_id}] Requesting WebSocket connection from pool")
         async with self._pool.connection(timeout=self._conn_options.timeout) as ws:  # type: ignore[attr-defined]
+            logger.info(f"[{self._request_id}] Got WebSocket connection from pool, closed={ws.closed}")
+            
+            # Check if connection is already closed and raise error if so
+            if ws.closed:
+                logger.error(f"[{self._request_id}] WebSocket connection from pool is already closed")
+                raise APIConnectionError("WebSocket connection from pool is already closed")
+            
             # Launch concurrent tasks: push text, send to WS, receive audio.
             input_task = asyncio.create_task(self._input_task())
             send_task = asyncio.create_task(self._send_task(ws))
@@ -375,6 +446,7 @@ class SynthesizeStream(tts.SynthesizeStream):
                         logger.warning(f"[{self._request_id}] {name} exited with: {res}")
                         raise res
             finally:
+                logger.info(f"[{self._request_id}] Finishing _run, WebSocket state: closed={ws.closed}")
                 await utils.aio.gracefully_cancel(*tasks)
 
     async def _input_task(self) -> None:
@@ -386,27 +458,40 @@ class SynthesizeStream(tts.SynthesizeStream):
                     continue
                 self._sent_tokenizer_stream.push_text(data_item)
 
-            self._sent_tokenizer_stream.end_input()
+            self._end_tokenizer_input()
         except asyncio.CancelledError:
             logger.info(f"[{self._request_id}] Input task cancelled.")
             # Ensure tokenizer is properly closed even when cancelled
-            self._sent_tokenizer_stream.end_input()
+            self._end_tokenizer_input()
             raise
         except Exception as e:
             logger.exception(f"[{self._request_id}] Error in _input_task: {e}")
             # End tokenizer input on error to prevent hanging
-            self._sent_tokenizer_stream.end_input()
+            self._end_tokenizer_input()
             raise
+    
+    def _end_tokenizer_input(self) -> None:
+        """Safely end tokenizer input, ensuring it's only called once."""
+        if not self._tokenizer_stream_closed:
+            try:
+                self._sent_tokenizer_stream.end_input()
+                self._tokenizer_stream_closed = True
+            except Exception as e:
+                logger.warning(f"[{self._request_id}] Error ending tokenizer input: {e}")
+                # Still mark as closed to prevent further attempts
+                self._tokenizer_stream_closed = True
 
     async def _send_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
         """Reads tokens from the tokenizer and sends them to the WebSocket."""
         try:
             has_sent_any_token = False
+            has_any_token_to_send = False
             async for ev in self._sent_tokenizer_stream:
                 token = ev.token
                 if not token.strip(): # Avoid sending empty strings
                     continue
                     
+                has_any_token_to_send = True
                 send_payload = {
                     "event": "task_continue",
                     "text": token + " "
@@ -421,18 +506,24 @@ class SynthesizeStream(tts.SynthesizeStream):
                 
                 # Check if WebSocket is still open before sending
                 if ws.closed:
-                    logger.error(f"[{self._request_id}] WebSocket connection is closed, cannot send data")
+                    logger.error(f"[{self._request_id}] WebSocket connection is closed, cannot send data. Close code: {ws.close_code}, Close reason: {ws.exception()}")
                     raise APIConnectionError("WebSocket connection closed by server")
                 
-                await ws.send_json(send_payload)
-                has_sent_any_token = True
+                try:
+                    await ws.send_json(send_payload)
+                    has_sent_any_token = True
+                except (aiohttp.ClientConnectionError, ConnectionResetError) as e:
+                    logger.error(f"[{self._request_id}] WebSocket send failed: {e}")
+                    raise APIConnectionError(f"WebSocket send failed: {e}")
 
             # Mark tokenizer as finished
             async with self._pending_tasks_lock:
                 self._tokenizer_finished = True
                 logger.info(f"[{self._request_id}] Tokenizer stream completed. Total tasks sent: {self._pending_tasks_count}")
             
-            if not has_sent_any_token:
+            # Only set _no_tokens_sent_event if there were genuinely no tokens to send
+            if not has_any_token_to_send:
+                logger.info(f"[{self._request_id}] No tokens to send, setting _no_tokens_sent_event")
                 self._no_tokens_sent_event.set()
         except (aiohttp.ClientError, ConnectionResetError, OSError) as e:
             logger.error(f"[{self._request_id}] WebSocket connection error in _send_task: {e}")
@@ -492,7 +583,11 @@ class SynthesizeStream(tts.SynthesizeStream):
                     break
 
                 # 如果是 ws.receive() 完成
-                msg = receive_ws_task.result()
+                try:
+                    msg = receive_ws_task.result()
+                except (aiohttp.ClientConnectionError, ConnectionResetError) as e:
+                    logger.error(f"[{self._request_id}] WebSocket receive failed: {e}")
+                    raise APIConnectionError(f"WebSocket receive failed: {e}")
 
                 if msg.type in (
                     aiohttp.WSMsgType.CLOSED,
@@ -500,6 +595,7 @@ class SynthesizeStream(tts.SynthesizeStream):
                     aiohttp.WSMsgType.CLOSING,
                 ):
                     # Properly end the stream when WebSocket connection closes
+                    logger.info(f"[{self._request_id}] WebSocket connection closed by server, msg_type={msg.type}, close_code={ws.close_code}, close_reason={ws.exception()}")
                     emitter.flush()
                     break
                 

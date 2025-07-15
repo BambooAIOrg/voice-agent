@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/peanut/voice-agent"
+      ]
+    },
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@henkey/postgres-mcp-server",
+        "--connection-string",
+        "${DATABASE_URL}"
+      ]
+    }
+  }
+}
