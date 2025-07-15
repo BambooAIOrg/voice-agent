@@ -1,16 +1,14 @@
-from datetime import datetime
 from dotenv import load_dotenv
-import pytz
 import json
 import asyncio
 from livekit.rtc import DataPacket
 from bamboo_shared.enums.official_website import OfficialWebsitePhase
 from agents.official_website.context import AgentContext
 from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
-from agents.official_website.agents.vocabulary import VocabularyAgent
-from agents.official_website.agents.scene import SceneAgent
-from agents.official_website.agents.writing import WritingAgent
 from agents.official_website.agents.chat import ChatAgent
+from agents.official_website.agents.scene import SceneAgent
+from agents.official_website.agents.vocabulary import VocabularyAgent
+from agents.official_website.agents.writing import WritingAgent
 
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
@@ -37,12 +35,9 @@ logger = get_logger(__name__)
 async def official_website_entrypoint(ctx: JobContext, metadata: dict):
     """Entrypoint for official_website learning agents"""
     visitor_id = metadata.get("visitor_id", "")
-    
-    context = AgentContext(
-        visitor_id=visitor_id,
-    )
+    context = AgentContext(visitor_id=visitor_id)
     await context.initialize_async_context()
-    
+
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1"),
@@ -82,23 +77,35 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
 
     logger.info(f"session started")
 
+    def get_agent_by_phase(phase: OfficialWebsitePhase):
+        """根据阶段创建对应的 Agent"""
+        match phase:
+            case OfficialWebsitePhase.VOCABULARY:
+                return VocabularyAgent(context=context)
+            case OfficialWebsitePhase.SCENE:
+                return SceneAgent(context=context)
+            case OfficialWebsitePhase.WRITING:
+                return WritingAgent(context=context)
+            case OfficialWebsitePhase.CHAT:
+                return ChatAgent(context=context)
+            case _:
+                raise ValueError(f"Invalid phase: {phase}")
+
     async def switch_agent(phase: OfficialWebsitePhase):
         # 更新阶段
-        await context.update_phase(phase)
-
-
-
-
+        context.update_phase(phase)
+        agent = get_agent_by_phase(context.phase)
         # 发送确认消息
         asyncio.create_task(
             ctx.room.local_participant.publish_data(
-                json.dumps({"type": "agent_switched", "phase": phase}).encode("utf-8"),
+                payload=json.dumps({"type": "agent_switched", "phase": phase.value}).encode("utf-8"),
                 reliable=True,
                 topic="agent_control"
             )
         )
-        logger.info(f"Agent 切换成功: {phase}")
-
+        # 播放切换提示
+        await session.say(text=f"好吧，接下来让我给你介绍{context.get_phase_description(phase.value)}。")
+        session.update_agent(agent)
 
     # 监听前端消息
     @ctx.room.on("data_received")
@@ -106,8 +113,11 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
         try:
             data = json.loads(payload.data.decode("utf-8"))
             if data.get("type") == "switch_agent":
-                phase = data.get("phase")
-                # 异步调用 switch_agent（未实现，需补充）
+                phase_str = data.get("phase")
+                try:
+                    phase = OfficialWebsitePhase(phase_str)
+                except ValueError:
+                    raise ValueError(f"Unknown phase string: {phase_str}")
                 asyncio.create_task(switch_agent(phase))
         except Exception as e:
             logger.error(f"处理消息失败: {e}")
@@ -121,21 +131,10 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
             )
 
 
-    agent = None
-    match context.phase:
-        case OfficialWebsitePhase.VOCABULARY:
-            agent = VocabularyAgent(context=context)
-        case OfficialWebsitePhase.SCENE:
-            agent = SceneAgent(context=context)
-        case OfficialWebsitePhase.WRITING:
-            agent = WritingAgent(context=context)
-        case OfficialWebsitePhase.CHAT:
-            agent = ChatAgent(context=context)
-        case _:
-            raise ValueError(f"Invalid phase: {context.phase}")
+
 
     await session.start(
-        agent=agent,
+        agent=get_agent_by_phase(context.phase),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
@@ -147,33 +146,5 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
         ),
     )
 
-    # 获取北京时间
-    beijing_tz = pytz.timezone('Asia/Shanghai')
-    now = datetime.now(beijing_tz)
-
-    last_communication_time = context.last_communication_time
-    phase = context.phase
-    current_word = context.current_word
-
-    # 简洁中文说明
-    phase_description = {
-        "vocabulary": "",
-        "scene": "",
-        "writing": "",
-        "chat": "",
-    }
-
-    # 生成自然语言 instructions 提示词
-    if last_communication_time:
-        instructions = (
-            f"用户上次交互时间为 {last_communication_time.isoformat()}，当前时间是 {now.isoformat()}。"
-            f"目前用户正在介绍的产品功能模块的是：{phase_description[phase.value]}。"
-            f"请用1句温暖自然的语气欢迎用户回来，可以酌情融入当前时间，继续介绍这个功能模块，避免正式或冗长表达。"
-        )
-    else:
-        instructions = (
-            f"这是用户今天第一次进入产品介绍页面，当前时间是 {now.isoformat()}。"
-            f"目前将介绍的产品功能模块是 {phase_description[phase.value]}。"
-            f"请用1句自然轻快、亲切友好的语气欢迎用户，可以酌情融入当前时间，介绍这个功能模块，避免正式或冗长表达。"
-        )
+    instructions=context.get_say_greeting_instructions()
     await session.generate_reply(instructions=instructions)
