@@ -61,3 +61,39 @@ app:
           data_id: "app.vocab.agent.shot.assessment"
           group: "agent_shot"
           type: "YAML"
+  official_website:
+    agent:
+      instruction:
+        vocabulary:
+          data_id: "app.official_website.agent.instruction.vocabulary"
+          group: "agent_instruction"
+          type: "TEXT"
+        scene:
+          data_id: "app.official_website.agent.instruction.scene"
+          group: "agent_instruction"
+          type: "TEXT"
+        writing:
+          data_id: "app.official_website.agent.instruction.writing"
+          group: "agent_instruction"
+          type: "TEXT"
+        chat:
+          data_id: "app.official_website.agent.instruction.chat"
+          group: "agent_instruction"
+          type: "TEXT"
+      shot:
+        vocabulary:
+          data_id: "app.official_website.agent.shot.vocabulary"
+          group: "agent_shot"
+          type: "YAML"
+        scene:
+          data_id: "app.official_website.agent.shot.scene"
+          group: "agent_shot"
+          type: "YAML"
+        writing:
+          data_id: "app.official_website.agent.shot.writing"
+          group: "agent_shot"
+          type: "YAML"
+        chat:
+          data_id: "app.official_website.agent.shot.chat"
+          group: "agent_shot"
+          type: "YAML"
