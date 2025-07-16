@@ -87,11 +87,9 @@ class MainScheduleAgent(LivekitAgent):
             agent = RouteAnalysisAgent(context=context.userdata)
             return agent, None
         
-        # 更新指令并继续当前代理
         await self.update_instructions(self._get_current_instructions())
-        logger.info(f"Proceeded to phase: {self.context.phase.value}")
         
-        return self, None
+        return MainScheduleAgent(context=context.userdata), None
 
     @function_tool
     async def transfer_to_next_word_agent(
