@@ -20,7 +20,7 @@ class RouteAnalysisAgent(LivekitAgent):
         )
 
         logger.info(f"template_variables: {self.template_variables}")
-        logger.info(f"context: {context}")
+        logger.info(f"RouteAnalysisAgent initialized for user_id: {context.user_id}, word_id: {context.word_id}")
         instructions = get_instructions(
             self.template_variables,
             "analysis_route",
@@ -35,13 +35,22 @@ class RouteAnalysisAgent(LivekitAgent):
     async def transfer_to_main_schedule_agent(
         self,
         context: RunContext[AgentContext],
+        user_demonstrates_clear_mastery: bool,
+        reason_for_mastery_status: str,
+        user_accepts_word_creation_logic: bool = True,
     ):
-        """Call this function when the student confirms they are ready to start learning about etymology."""
-        from agents.vocab.agents.word_creation_analysis import WordCreationAnalysisAgent
-        logger.info("Handing off to EtymologyAgent.")
+        """Handoff to the Main Schedule Agent agent to handle the request.
+        
+        Args:
+            user_demonstrates_clear_mastery: Whether the user demonstrates clear mastery of the word
+            reason_for_mastery_status: A brief teacher comment explaining *why* `user_demonstrates_clear_mastery` is True or False
+            user_accepts_word_creation_logic: Whether the user wants to learn about the word's creation logic and etymology. Defaults to True for users who didn't demonstrate mastery (no need to ask). Only set explicitly when user demonstrated mastery and was asked about their preference.
+        """
+        from agents.vocab.agents.main_schedule_agent import MainScheduleAgent
+        logger.info(f"Handing off to MainScheduleAgent. Mastery: {user_demonstrates_clear_mastery}, Reason: {reason_for_mastery_status}, Accepts logic: {user_accepts_word_creation_logic}")
         context.userdata.chat_context = context.session._chat_ctx
-        etymology_agent = WordCreationAnalysisAgent(context=context.userdata)
-        return etymology_agent, None
+        main_schedule_agent = MainScheduleAgent(context=context.userdata)
+        return main_schedule_agent, None
     
     @function_tool
     async def transfer_to_next_word_agent(

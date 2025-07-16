@@ -1,13 +1,11 @@
-from asyncio.log import logger
-from datetime import datetime
-from typing import Sequence
-from livekit.agents.llm.chat_context import ChatContext, FunctionCall, FunctionCallOutput, ChatMessage as LivekitChatMessage, ChatItem
+from livekit.agents.llm.chat_context import FunctionCall, FunctionCallOutput
 from bamboo_shared.repositories import ChatRepository
-from bamboo_shared.models.Chat import ChatMessage, Chat
-from bamboo_shared.enums.vocabulary import VocabularyPhase
-from bamboo_shared.service.vocabulary import VocabPlanService
+from bamboo_shared.models.Chat import ChatMessage
 import uuid
 from agents.vocab.context import AgentContext
+from bamboo_shared.logger import get_logger
+
+logger = get_logger(__name__)
 
 class MessageService:
     def __init__(self, user_id: int, context: AgentContext):
@@ -15,17 +13,13 @@ class MessageService:
         self.context = context
         self.chat_repo = ChatRepository(user_id)
 
-    async def save_user_message(self, content: str, phase: VocabularyPhase | None = None, meta_data: dict | None = None) -> str:
+    async def save_user_message(self, content: str, meta_data: dict | None = None) -> str:
         """Save a user message to the database and return the message ID."""
         message_id = str(uuid.uuid4())
         
         chat_id = self.context.chat_id
         if not chat_id:
             raise ValueError("chat_id is None")
-        
-        message_meta_data = meta_data or {}
-        if phase:
-            message_meta_data["phase"] = phase.value
         
         message = ChatMessage(
             id=message_id,
@@ -47,16 +41,13 @@ class MessageService:
         self.context.update_chat_current_node(message_id)
         return message_id
 
-    async def save_assistant_message(self, content: str, phase: VocabularyPhase | None = None, meta_data: dict | None = None) -> str:
+    async def save_assistant_message(self, content: str, meta_data: dict | None = None) -> str:
         """Save an assistant message to the database and return the message ID."""
         message_id = str(uuid.uuid4())
         chat_id = self.context.chat_id
         if not chat_id:
             raise ValueError("chat_id is None")
         
-        message_meta_data = meta_data or {}
-        if phase:
-            message_meta_data["phase"] = phase.value
         
         message = ChatMessage(
             id=message_id,
@@ -70,7 +61,7 @@ class MessageService:
             author={"role": "assistant"},
             content=content,
             end_turn=True,
-            meta_data=message_meta_data
+            meta_data=meta_data
         )
         
         await self.chat_repo.save_messages([message])
@@ -78,7 +69,7 @@ class MessageService:
         self.context.update_chat_current_node(message_id)
         return message_id
 
-    async def save_function_call_message(self, function_call: FunctionCall) -> str:
+    async def save_function_call_message(self, function_call: FunctionCall, meta_data: dict | None = None) -> str:
         """Save a function call message to the database and return the message ID."""
         message_id = str(uuid.uuid4())
         chat_id = self.context.chat_id
@@ -103,7 +94,7 @@ class MessageService:
                 }
             },
             end_turn=True,
-            meta_data={}
+            meta_data=meta_data
         )
         
         await self.chat_repo.save_messages([message])

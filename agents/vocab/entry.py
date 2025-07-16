@@ -20,17 +20,8 @@ from livekit.plugins import noise_cancellation
 from plugins.aliyun.stt import AliSTT
 from plugins.minimax.tts import TTS as MinimaxTTS
 from agents.vocab.service.event_service import EventService
-from agents.vocab.service.message_service import MessageService
 from agents.vocab.agents.greeting_agent import GreetingAgent
-from bamboo_shared.repositories.chat_reference import ChatReferenceRepository
-from bamboo_shared.repositories.chat import ChatRepository
 from bamboo_shared.logger import get_logger
-from bamboo_shared.service.vocabulary import VocabPlanService
-from bamboo_shared.models.Chat import ChatReference, Chat
-from bamboo_shared.repositories.vocabulary import VocabularyRepository
-import uuid
-import asyncio
-
 
 logger = get_logger(__name__)
 
@@ -93,8 +84,6 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         logger.info(f"Usage: {summary}")
 
     ctx.add_shutdown_callback(log_usage)
-
-    logger.info(f"session started")
 
     await session.start(
         agent=GreetingAgent(context=context),

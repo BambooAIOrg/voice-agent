@@ -8,6 +8,7 @@ import pytz
 from agents.vocab.context import AgentContext
 from bamboo_shared.logger import get_logger
 from livekit.agents import Agent as LivekitAgent
+from livekit.agents.llm.chat_context import ChatMessage as LivekitChatMessage
 
 logger = get_logger(__name__)
 
@@ -35,43 +36,50 @@ class GreetingAgent(LivekitAgent):
             Here are some information to you for reference: this is the first learning session of the day, current time is {now.isoformat()}.
             """
 
-        logger.info(f"instructions: {instructions}")
+        history_str = ""
+        for item in context.chat_context.items:
+            if not isinstance(item, LivekitChatMessage):
+                continue
+
+            if item.role == "user":
+                history_str += f"User：{item.text_content}\n"
+            else:
+                history_str += f"AI Teacher：{item.text_content}\n"
+
+        instructions += f"""
+        After exchanging pleasantries, seamlessly hand off the conversation to the appropriate teaching agent **without exposing the agent switch to the user**.
+        
+        Previous conversation history is provided below for context.
+        ```
+        {history_str}
+        ```
+        """
+
         super().__init__(
             instructions=instructions,
         )
 
     async def on_enter(self):
-        logger.info("GreetingAgent on_enter")
-        # await super().on_enter()
-        logger.info("GreetingAgent on_enter after super")
-        await self.session.generate_reply()
+        logger.info(f"GreetingAgent on_enter")
+        await self.session.generate_reply(allow_interruptions=False)
 
     @function_tool
-    async def start_learning(
+    async def handoff_to_teaching_agent(
         self,
         context: RunContext[AgentContext],
     ):
-        """Call this function ONLY after interactively discussing origin, root, and affixes in Chinese."""
-        from agents.vocab.agents.co_occurrence import CoOccurrenceAgent
-        from agents.vocab.agents.synonym import SynonymAgent
-        from agents.vocab.agents.word_creation_analysis import WordCreationAnalysisAgent
+        """Dispatch the conversation to the appropriate teaching agent based on user context."""
+        
         from agents.vocab.agents.route_analysis import RouteAnalysisAgent
-        from agents.vocab.agents.sentence_practice import SentencePracticeAgent
+        from agents.vocab.agents.main_schedule_agent import MainScheduleAgent
         from agents.vocab.context import VocabularyPhase
         
+        logger.info(f"handoff_to_teaching_agent: {context.userdata.phase}")
         agent_context = context.userdata
-        match context.userdata.phase:
-            case VocabularyPhase.ANALYSIS_ROUTE:
-                agent = RouteAnalysisAgent(context=agent_context)
-            case VocabularyPhase.WORD_CREATION_LOGIC:
-                agent = WordCreationAnalysisAgent(context=agent_context)
-            case VocabularyPhase.SYNONYM_DIFFERENTIATION:
-                agent = SynonymAgent(context=agent_context)
-            case VocabularyPhase.CO_OCCURRENCE:
-                agent = CoOccurrenceAgent(context=agent_context)
-            case VocabularyPhase.QUESTION_ANSWER:
-                agent = SentencePracticeAgent(context=agent_context)
-            case _:
-                raise ValueError(f"Invalid phase: {agent_context.phase}")
+
+        if context.userdata.phase == VocabularyPhase.ANALYSIS_ROUTE:
+            agent = RouteAnalysisAgent(context=agent_context)
+        else:
+            agent = MainScheduleAgent(context=agent_context)
 
         return agent, None

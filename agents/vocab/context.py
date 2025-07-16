@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Sequence
 from bamboo_shared.models import (
     User,
     Vocabulary,
-    VocabularyWebContent,
     ChatReference,
     ChatMessage,
     Chat,
@@ -72,20 +71,18 @@ class Context:
 
     # word info
     word: Vocabulary
-    web_content: VocabularyWebContent
     # learning status
     chat_reference: ChatReference
     phase: VocabularyPhase
     task_list: List[WordTask]
     last_communication_time: datetime | None
-    chat_context: ChatContext | None
+    chat_context: ChatContext
 
-    def __init__(self, user_info: User, user_characteristics: str, english_level: UserEnglishLevel, word: Vocabulary, web_content: VocabularyWebContent, chat_reference: ChatReference, task_list: List[WordTask]):
+    def __init__(self, user_info: User, user_characteristics: str, english_level: UserEnglishLevel, word: Vocabulary, chat_reference: ChatReference, task_list: List[WordTask]):
         self.user_info = user_info
         self.user_characteristics = user_characteristics
         self.english_level = english_level
         self.word = word
-        self.web_content = web_content
         self.chat_reference = chat_reference
         self.task_list = task_list
         self.chat_repo = ChatRepository(user_info.id)
@@ -104,15 +101,6 @@ class Context:
 
     def get_example_sentence(self) -> str:
         return self.word.sentence
-
-    def get_web_image_results(self) -> list:
-        return self.web_content.image_results
-
-    def get_web_content_results(self) -> dict:
-        return {
-            "news_results": self.web_content.news_results,
-            "interesting_results": self.web_content.interesting_results,
-        }
 
     def get_metadata(self) -> Dict[str, Any]:
         return {
@@ -165,7 +153,7 @@ class Context:
 
             self.word = next_word
             self.phase = VocabularyPhase.WORD_CREATION_LOGIC
-            self.chat_reference = await vocab_repo.ensure_word_reference(
+            self.chat_reference = await vocab_repo.ensure_chat_reference(
                 next_word.id, chat_id
             )
 
@@ -190,7 +178,7 @@ class AgentContext(Context):
             writing=EnglishLevel.A1,
             speaking=EnglishLevel.A1
         )
-        self.chat_context = None
+        self.chat_context = ChatContext()
         self.chat_history = []
         self.last_communication_time = None
         self.current_node = None
@@ -232,12 +220,15 @@ class AgentContext(Context):
                 reference_type="vocabulary",
                 phase=VocabularyPhase.ANALYSIS_ROUTE.value
             ))
+            self.chat_reference = chat_reference
             self.phase = VocabularyPhase.ANALYSIS_ROUTE
+            self.chat_context = ChatContext()
         else:
-            chat_reference = await self.word_repo.ensure_word_reference(
+            chat_reference = await self.word_repo.ensure_chat_reference(
                 self.word_id,
                 self.chat_id
             )
+            self.chat_reference = chat_reference
             vocab_service = VocabPlanService()
             chat_task = asyncio.create_task(self.chat_repo.get_by_id(chat_reference.chat_id))
             chat_ids_task = asyncio.create_task(vocab_service.get_current_group_chat_ids(self.user_id))

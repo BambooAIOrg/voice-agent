@@ -44,11 +44,10 @@ class EventService:
             if item.role == "user":
                 await self.message_service.save_user_message(
                     content=text_content,
-                    phase=self.context.phase,
                     meta_data={
                         "word_id": self.context.word.id,
                         "word": self.context.word.word,
-                        "phase": self.context.phase,
+                        "phase": self.context.phase.value,
                         "interrupted": getattr(item, 'interrupted', False)
                     }
                 )
@@ -57,11 +56,10 @@ class EventService:
                 logger.info(f"Saving assistant message: {self.context.phase}")
                 await self.message_service.save_assistant_message(
                     content=text_content,
-                    phase=self.context.phase,
                     meta_data={
                         "word_id": self.context.word.id,
                         "word": self.context.word.word,
-                        "phase": self.context.phase,
+                        "phase": self.context.phase.value,
                         "interrupted": getattr(item, 'interrupted', False)
                     }
                 )
@@ -74,7 +72,14 @@ class EventService:
             # Save function calls and their outputs
             for func_call, func_output in event.zipped():
                 # Save function call
-                await self.message_service.save_function_call_message(func_call)
+                await self.message_service.save_function_call_message(
+                    func_call,
+                    meta_data={
+                        "word_id": self.context.word.id,
+                        "word": self.context.word.word,
+                        "phase": self.context.phase.value,
+                    }
+                )
                 logger.info(f"Saved function call: {func_call.name}")
                 
                 if func_output:

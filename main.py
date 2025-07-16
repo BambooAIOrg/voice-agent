@@ -31,14 +31,14 @@ def prewarm(proc: JobProcess):
 
 async def request_fnc(request: JobRequest):
     logger.info(f"ENV: {os.getenv('ENV')}")
-    logger.info(f"Metadata: {request.room.metadata}")
-    if not request.room.metadata:
+    logger.info(f"Metadata: {request.job.metadata}")
+    if not request.job.metadata:
         logger.warning("Rejecting request: No metadata provided")
         await request.reject()
         return
 
     try:
-        metadata = json.loads(request.room.metadata)
+        metadata = json.loads(request.job.metadata)
     except json.JSONDecodeError as e:
         logger.error(f"Rejecting request: Invalid JSON metadata - {e}")
         await request.reject()
@@ -106,5 +106,6 @@ if __name__ == "__main__":
         entrypoint_fnc=entrypoint,
         prewarm_fnc=prewarm,
         request_fnc=request_fnc,
-        load_fnc=load_fnc
+        load_fnc=load_fnc,
+        agent_name="vocab-agent",
     ))
