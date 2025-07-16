@@ -5,7 +5,6 @@ from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_toke
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
-from dataclasses import dataclass
 
 from livekit.agents import (
     AgentSession,
@@ -56,7 +55,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         stt=AliSTT(),
         tts=MinimaxTTS(
             model="speech-02-turbo",
-            voice_id="Chinese (Mandarin)_Cute_Spirit",
+            voice_id="Chinese (Mandarin)_Soft_Girl",
             sample_rate=32000,
             bitrate=128000,
             emotion="happy"

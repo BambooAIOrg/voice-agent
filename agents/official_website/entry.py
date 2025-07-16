@@ -4,7 +4,7 @@ import asyncio
 from livekit.rtc import DataPacket
 from bamboo_shared.enums.official_website import OfficialWebsitePhase
 from agents.official_website.context import AgentContext
-from plugins.tokenizer.mixedLanguangeTokenizer import install_mixed_language_tokenize
+from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
 from agents.official_website.agents.chat import ChatAgent
 from agents.official_website.agents.scene import SceneAgent
 from agents.official_website.agents.vocabulary import VocabularyAgent
