@@ -38,6 +38,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     )
     # Initialize context with improved error handling
     try:
+        logger.info(f"Initializing agent context for user {user_id} and word {word_id}")
         await context.initialize_async_context()
     except Exception as e:
         logger.error(f"Failed to initialize agent context: {e}")
@@ -84,6 +85,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
 
     ctx.add_shutdown_callback(log_usage)
 
+    logger.info(f"Starting session for user {user_id} and word {word_id}")
     await session.start(
         agent=GreetingAgent(context=context),
         room=ctx.room,
