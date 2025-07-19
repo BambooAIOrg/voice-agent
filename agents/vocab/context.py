@@ -189,58 +189,80 @@ class AgentContext(Context):
     async def initialize_async_context(self):
         """Initialize all async context components with proper error handling"""
         try:
+            start_time = asyncio.get_event_loop().time()
+            
             # Initialize word and user info first (they can run in parallel)
             user_task = asyncio.create_task(self._initialize_user_info())
             word_task = asyncio.create_task(self._initialize_word_task())
             
             await asyncio.gather(user_task, word_task)
+            user_word_time = asyncio.get_event_loop().time()
             
             # Initialize chat context after word is available
             await self._initialize_chat_context()
             
-            logger.info("Context initialization completed successfully")
+            total_time = asyncio.get_event_loop().time() - start_time
+            chat_time = asyncio.get_event_loop().time() - user_word_time
+            
+            logger.info(f"Context initialization completed - Total: {total_time:.2f}s, Chat context: {chat_time:.2f}s")
             
         except Exception as e:
             logger.error(f"Unexpected error during context initialization: {e}")
             raise ContextInitializationError(f"Context initialization failed: {e}") from e
 
     async def _initialize_chat_context(self):
+        chat_start_time = asyncio.get_event_loop().time()
+        
         if not self.chat_id:
+            # New chat creation - minimal overhead
             self.chat_id = str(uuid.uuid4())
-            chat = await self.chat_repo.create_chat(Chat(
+            chat_task = asyncio.create_task(self.chat_repo.create_chat(Chat(
                 id=self.chat_id,
                 user_id=self.user_id,
                 type="vocabulary",
                 title=self.word.word,
-            ))
-            chat_reference = await self.chat_reference_repo.create(ChatReference(
+            )))
+            chat_ref_task = asyncio.create_task(self.chat_reference_repo.create(ChatReference(
                 user_id=self.user_id,
                 chat_id=self.chat_id,
                 reference_id=self.word_id,
                 reference_type="vocabulary",
                 phase=VocabularyPhase.ANALYSIS_ROUTE.value
-            ))
+            )))
+            
+            chat, chat_reference = await asyncio.gather(chat_task, chat_ref_task)
             self.chat_reference = chat_reference
             self.phase = VocabularyPhase.ANALYSIS_ROUTE
             self.chat_context = ChatContext()
+            
+            logger.debug(f"New chat created in {asyncio.get_event_loop().time() - chat_start_time:.2f}s")
         else:
+            # Existing chat - optimize heavy operations
             chat_reference = await self.word_repo.ensure_chat_reference(
                 self.word_id,
                 self.chat_id
             )
             self.chat_reference = chat_reference
+            
+            db_start_time = asyncio.get_event_loop().time()
             vocab_service = VocabPlanService()
             chat_task = asyncio.create_task(self.chat_repo.get_by_id(chat_reference.chat_id))
             chat_ids_task = asyncio.create_task(vocab_service.get_current_group_chat_ids(self.user_id))
             
             chat, chat_id_list = await asyncio.gather(chat_task, chat_ids_task)
+            db_time = asyncio.get_event_loop().time() - db_start_time
             
             if not chat:
                 raise ValueError(f"Chat not found for chat_reference: {chat_reference.id}")
             
-            # Load chat history
+            # Load and convert chat history
+            history_start_time = asyncio.get_event_loop().time()
             chat_history = await self.chat_repo.get_chat_messages_by_chat_ids(chat_id_list)
+            history_time = asyncio.get_event_loop().time() - history_start_time
+            
+            convert_start_time = asyncio.get_event_loop().time()
             self.chat_context = await self.convert_chat_history_to_chat_context(chat_history)
+            convert_time = asyncio.get_event_loop().time() - convert_start_time
             
             current_message = next((msg for msg in chat_history if msg.id == chat.current_node), None)
             if not current_message:
@@ -249,6 +271,9 @@ class AgentContext(Context):
             self.phase = VocabularyPhase(current_message.meta_data.get("phase"))
             self.last_communication_time = current_message.create_time
             self.update_chat_current_node(current_message.id)
+            
+            total_chat_time = asyncio.get_event_loop().time() - chat_start_time
+            logger.debug(f"Chat context loaded in {total_chat_time:.2f}s (DB: {db_time:.2f}s, History: {history_time:.2f}s, Convert: {convert_time:.2f}s)")
 
     async def _initialize_user_info(self):
         """Initialize user information with proper error handling"""
