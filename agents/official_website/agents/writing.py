@@ -12,19 +12,12 @@ logger = get_logger(__name__)
 
 # Placeholder for the next agent - will be implemented next
 class WritingAgent(Agent):
-    def __init__(self, context: AgentContext) -> None:
-        self.template_variables = TemplateVariables(
-            word=context.current_word,
-        )
-        instructions = get_instructions(
-            self.template_variables,
-            "writing",
-        )
+    def __init__(self) -> None:
         super().__init__(
-            instructions=instructions,
-            chat_ctx=context.chat_context
+            instructions="You are a helpful assistant that can answer questions about the official website.",
+            chat_ctx=None
         )
-        self.context = context
+        # self.context = context
 
     # async def on_enter(self):
     #     logger.info(f"etymology agent enter")

@@ -21,7 +21,7 @@ class UnsupportedRoomTypeError(AgentRoutingError):
 
 def _validate_metadata(metadata_dict: dict) -> None:
     """Validate metadata contains required fields"""
-    required_fields = ["room_type", "user_id"]
+    required_fields = ["room_type"]
     missing_fields = [field for field in required_fields if field not in metadata_dict]
     
     if missing_fields:
@@ -46,10 +46,9 @@ async def entrypoint(ctx: JobContext):
             from agents.onboarding import onboarding_entrypoint
             await onboarding_entrypoint(ctx, metadata)
         
-        # elif room_type == "grammar":
-        #     from agents.grammar import grammar_entrypoint
-        #     await grammar_entrypoint(ctx, metadata)
-        
+        elif room_type == "official_website":
+            from agents.official_website import official_website_entrypoint
+            await official_website_entrypoint(ctx, metadata)
         else:
             raise UnsupportedRoomTypeError(f"Unsupported room type: {room_type}")
     

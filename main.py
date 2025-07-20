@@ -45,7 +45,7 @@ async def request_fnc(request: JobRequest):
         return
     
     # Validate required fields
-    required_fields = ["env", "room_type", "user_id"]
+    required_fields = ["env", "room_type"]
     missing_fields = [field for field in required_fields if field not in metadata]
     if missing_fields:
         logger.error(f"Rejecting request: Missing required fields - {missing_fields}")
@@ -107,5 +107,5 @@ if __name__ == "__main__":
         prewarm_fnc=prewarm,
         request_fnc=request_fnc,
         load_fnc=load_fnc,
-        agent_name="vocab-agent",
+        agent_name="multiple-voice-agent",
     ))

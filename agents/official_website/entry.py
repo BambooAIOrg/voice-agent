@@ -10,6 +10,8 @@ from agents.official_website.agents.scene import SceneAgent
 from agents.official_website.agents.vocabulary import VocabularyAgent
 from agents.official_website.agents.writing import WritingAgent
 
+import random
+
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
 
@@ -21,6 +23,7 @@ from livekit.agents import (
     RoomInputOptions,
     RoomOutputOptions,
     metrics,
+    voice,
 )
 from livekit.agents.voice import MetricsCollectedEvent
 from livekit.plugins import openai
@@ -41,15 +44,10 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1"),
-        # stt=openai.STT(
-        #     model="gpt-4o-transcribe",
-        #     detect_language=True,
-        #     prompt=f"The following audio is from a Chinese student who is learning English with AI tutor. The student is currently learning the word: {context.word.word}"
-        # ),
         stt=AliSTT(),
         tts=MinimaxTTS(
             model="speech-02-turbo",
-            voice_id="Chinese (Mandarin)_Cute_Spirit",
+            voice_id="Chinese (Mandarin)_Gentle_Senior",
             sample_rate=32000,
             bitrate=128000,
             emotion="happy"
@@ -81,21 +79,17 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
         """根据阶段创建对应的 Agent"""
         match phase:
             case OfficialWebsitePhase.VOCABULARY:
-                return VocabularyAgent(context=context)
+                return VocabularyAgent()
             case OfficialWebsitePhase.SCENE:
-                return SceneAgent(context=context)
+                return SceneAgent()
             case OfficialWebsitePhase.WRITING:
-                return WritingAgent(context=context)
+                return WritingAgent()
             case OfficialWebsitePhase.CHAT:
-                return ChatAgent(context=context)
+                return ChatAgent()
             case _:
                 raise ValueError(f"Invalid phase: {phase}")
 
     async def switch_agent(phase: OfficialWebsitePhase):
-        # 更新阶段
-        context.update_phase(phase)
-        agent = get_agent_by_phase(context.phase)
-        # 发送确认消息
         asyncio.create_task(
             ctx.room.local_participant.publish_data(
                 payload=json.dumps({"type": "agent_switched", "phase": phase.value}).encode("utf-8"),
@@ -103,8 +97,13 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
                 topic="agent_control"
             )
         )
-        # 播放切换提示
-        await session.say(text=f"好吧，接下来让我给你介绍{context.get_phase_description(phase.value)}。")
+        session.interrupt()
+        phrases = ["上!", "该你了!", "Over to you!"]
+        selected_phrase = random.choice(phrases)
+        await session.say(text=f"Sure，{context.get_character_name(phase.value)}, {selected_phrase}")
+        context.update_phase(phase)
+        agent = get_agent_by_phase(context.phase)
+        
         session.update_agent(agent)
 
     # 监听前端消息
@@ -130,11 +129,8 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
                 )
             )
 
-
-
-
     await session.start(
-        agent=get_agent_by_phase(context.phase),
+        agent=VocabularyAgent(),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
@@ -145,6 +141,3 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
             audio_enabled=True,
         ),
     )
-
-    instructions=context.get_say_greeting_instructions()
-    await session.generate_reply(instructions=instructions)
