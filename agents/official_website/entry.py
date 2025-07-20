@@ -4,6 +4,7 @@ import asyncio
 from livekit.rtc import DataPacket
 from bamboo_shared.enums.official_website import OfficialWebsitePhase
 from agents.official_website.context import AgentContext
+from livekit.agents.llm import ChatContext
 from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
 from agents.official_website.agents.chat import ChatAgent
 from agents.official_website.agents.scene import SceneAgent
@@ -75,17 +76,17 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
 
     logger.info(f"session started")
 
-    def get_agent_by_phase(phase: OfficialWebsitePhase):
+    def get_agent_by_phase(phase: OfficialWebsitePhase, chat_ctx: ChatContext):
         """根据阶段创建对应的 Agent"""
         match phase:
             case OfficialWebsitePhase.VOCABULARY:
-                return VocabularyAgent()
+                return VocabularyAgent(chat_ctx=chat_ctx)
             case OfficialWebsitePhase.SCENE:
-                return SceneAgent()
+                return SceneAgent(chat_ctx=chat_ctx)
             case OfficialWebsitePhase.WRITING:
-                return WritingAgent()
+                return WritingAgent(chat_ctx=chat_ctx)
             case OfficialWebsitePhase.CHAT:
-                return ChatAgent()
+                return ChatAgent(chat_ctx=chat_ctx)
             case _:
                 raise ValueError(f"Invalid phase: {phase}")
 
@@ -102,7 +103,7 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
         selected_phrase = random.choice(phrases)
         await session.say(text=f"Sure，{context.get_character_name(phase.value)}, {selected_phrase}")
         context.update_phase(phase)
-        agent = get_agent_by_phase(context.phase)
+        agent = get_agent_by_phase(context.phase, session._chat_ctx)
         
         session.update_agent(agent)
 
@@ -130,7 +131,7 @@ async def official_website_entrypoint(ctx: JobContext, metadata: dict):
             )
 
     await session.start(
-        agent=VocabularyAgent(),
+        agent=VocabularyAgent(chat_ctx=ChatContext()),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),
