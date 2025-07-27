@@ -83,16 +83,19 @@ class GreetingAgent(LivekitAgent):
         from agents.vocab.agents.main_schedule_agent import MainScheduleAgent
         from agents.vocab.context import VocabularyPhase
         
-        logger.info(f"handoff_to_teaching_agent: {context.userdata.phase}")
-        agent_context = context.userdata
+        try:
+            logger.info(f"handoff_to_teaching_agent: {context.userdata.phase}")
+            agent_context = context.userdata
 
-        for item in self._chat_ctx.items:
-            logger.info(f"item: {item}")
-            agent_context.chat_context.insert(item)
-            
-        if context.userdata.phase == VocabularyPhase.ANALYSIS_ROUTE:
-            agent = RouteAnalysisAgent(context=agent_context)
-        else:
-            agent = MainScheduleAgent(context=agent_context)
+            for item in self._chat_ctx.items:
+                agent_context.chat_context.insert(item)
+                
+            if context.userdata.phase == VocabularyPhase.ANALYSIS_ROUTE:
+                agent = RouteAnalysisAgent(context=agent_context)
+            else:
+                agent = MainScheduleAgent(context=agent_context)
 
-        return agent, None
+            return agent, None
+        except Exception as e:
+            logger.error(f"Error in handoff_to_teaching_agent: {e}")
+            return None, "An error occurred while handing off to the teaching agent."
