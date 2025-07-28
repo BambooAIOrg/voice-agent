@@ -69,8 +69,20 @@ class EventService:
     async def _handle_function_tools_executed(self, event: FunctionToolsExecutedEvent):
         """Handle function tools executed event and save calls and outputs."""
         try:
-            # Save function calls and their outputs
+            # Define agent handoff function names to filter out
+            agent_handoff_functions = {
+                "transfer_to_teaching_agent",
+                "transfer_to_main_schedule_agent", 
+                "transfer_to_next_word_agent"
+            }
+            
+            # Save function calls and their outputs (except agent handoffs)
             for func_call, func_output in event.zipped():
+                # Skip agent handoff functions
+                if func_call.name in agent_handoff_functions:
+                    logger.debug(f"Skipping agent handoff function: {func_call.name}")
+                    continue
+                    
                 # Save function call
                 await self.message_service.save_function_call_message(
                     func_call,

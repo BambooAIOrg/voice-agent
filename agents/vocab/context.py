@@ -311,25 +311,44 @@ class AgentContext(Context):
     async def convert_chat_history_to_chat_context(self, chat_history: Sequence[ChatMessage]) -> ChatContext:
         chat_context_items: list[ChatItem] = []
 
+        # Define agent handoff function names to filter out
+        agent_handoff_functions = {
+            "transfer_to_teaching_agent",
+            "transfer_to_main_schedule_agent", 
+            "transfer_to_next_word_agent"
+        }
+
         for msg in chat_history:
             if msg.meta_data.get("is_transition"):
                 continue
 
             if msg.type == "function_call":
+                function_name = msg.content["function"]["name"]
+                # Skip agent handoff function calls
+                if function_name in agent_handoff_functions:
+                    logger.debug(f"Skipping agent handoff function call: {function_name}")
+                    continue
+                    
                 logger.info(f"msg.content: {msg.content}")
                 chat_context_items.append(FunctionCall(
                     id=msg.id,
                     type="function_call",
                     call_id=msg.content["call_id"],
-                    name=msg.content["function"]["name"],
+                    name=function_name,
                     arguments=msg.content["function"]["arguments"],
                 ))
             elif msg.type == "function_call_output":
+                function_name = msg.content["tool_name"]
+                # Skip agent handoff function outputs
+                if function_name in agent_handoff_functions:
+                    logger.debug(f"Skipping agent handoff function output: {function_name}")
+                    continue
+                    
                 chat_context_items.append(FunctionCallOutput(
                     id=msg.id,
                     type="function_call_output",
                     call_id=msg.content["tool_call_id"],
-                    name=msg.content["tool_name"],
+                    name=function_name,
                     output=msg.content["output"],
                     is_error=True if msg.content["error"] else False,
                 ))

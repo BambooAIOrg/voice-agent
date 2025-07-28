@@ -9,9 +9,9 @@ from agents.vocab.context import AgentContext
 from bamboo_shared.logger import get_logger
 from livekit.agents import Agent as LivekitAgent
 from livekit.agents.llm.chat_context import ChatMessage as LivekitChatMessage
+from bamboo_shared.agent.instructions import prompt_with_voice_mindset_instructions
 
 logger = get_logger(__name__)
-
 
 class GreetingAgent(LivekitAgent):
     def __init__(self, context: AgentContext) -> None:
@@ -58,7 +58,7 @@ class GreetingAgent(LivekitAgent):
         else:
             history_context = ""
 
-        return (
+        return prompt_with_voice_mindset_instructions(
             f"Begin by exchanging pleasantries with the user {nickname} and wait for the user's reply."
             f"Be like a friend or a foreigner english teacher, not an assistant. "
             f"Keep it simple and natural. Just one short sentence."
@@ -73,7 +73,7 @@ class GreetingAgent(LivekitAgent):
         await self.session.generate_reply(allow_interruptions=False)
 
     @function_tool
-    async def handoff_to_teaching_agent(
+    async def transfer_to_teaching_agent(
         self,
         context: RunContext[AgentContext],
     ):
@@ -89,7 +89,9 @@ class GreetingAgent(LivekitAgent):
 
             for item in self._chat_ctx.items:
                 agent_context.chat_context.insert(item)
-                
+
+            logger.info(f"chat_context: {self._chat_ctx.to_dict()}")
+            logger.info(f"chat_context: {agent_context.chat_context.to_dict()}")
             if context.userdata.phase == VocabularyPhase.ANALYSIS_ROUTE:
                 agent = RouteAnalysisAgent(context=agent_context)
             else:

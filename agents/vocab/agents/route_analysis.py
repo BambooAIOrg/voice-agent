@@ -35,7 +35,7 @@ class RouteAnalysisAgent(LivekitAgent):
         )
     
     async def on_enter(self):
-        await self.session.generate_reply(allow_interruptions=False)
+        await self.session.generate_reply()
 
     @function_tool
     async def transfer_to_main_schedule_agent(
@@ -55,6 +55,8 @@ class RouteAnalysisAgent(LivekitAgent):
         from agents.vocab.agents.main_schedule_agent import MainScheduleAgent
         logger.info(f"Handing off to MainScheduleAgent. Mastery: {user_demonstrates_clear_mastery}, Reason: {reason_for_mastery_status}, Accepts logic: {user_accepts_word_creation_logic}")
         context.userdata.chat_context = context.session._chat_ctx
+
+        logger.info(f"chat_context: {context.userdata.chat_context.items}")
         main_schedule_agent = MainScheduleAgent(context=context.userdata)
         return main_schedule_agent, None
     
