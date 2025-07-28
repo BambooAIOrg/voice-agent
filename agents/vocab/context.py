@@ -213,6 +213,7 @@ class AgentContext(Context):
     async def _initialize_chat_context(self):
         chat_start_time = asyncio.get_event_loop().time()
         
+        logger.info(f"Initializing chat context for user_id: {self.user_id}, word_id: {self.word_id}, chat_id: {self.chat_id}")
         if not self.chat_id:
             # New chat creation - minimal overhead
             self.chat_id = str(uuid.uuid4())
@@ -244,25 +245,19 @@ class AgentContext(Context):
             )
             self.chat_reference = chat_reference
             
-            db_start_time = asyncio.get_event_loop().time()
             vocab_service = VocabPlanService()
             chat_task = asyncio.create_task(self.chat_repo.get_by_id(chat_reference.chat_id))
             chat_ids_task = asyncio.create_task(vocab_service.get_current_group_chat_ids(self.user_id))
             
             chat, chat_id_list = await asyncio.gather(chat_task, chat_ids_task)
-            db_time = asyncio.get_event_loop().time() - db_start_time
             
             if not chat:
                 raise ValueError(f"Chat not found for chat_reference: {chat_reference.id}")
             
             # Load and convert chat history
-            history_start_time = asyncio.get_event_loop().time()
             chat_history = await self.chat_repo.get_chat_messages_by_chat_ids(chat_id_list)
-            history_time = asyncio.get_event_loop().time() - history_start_time
             
-            convert_start_time = asyncio.get_event_loop().time()
             self.chat_context = await self.convert_chat_history_to_chat_context(chat_history)
-            convert_time = asyncio.get_event_loop().time() - convert_start_time
             
             current_message = next((msg for msg in chat_history if msg.id == chat.current_node), None)
             if not current_message:
@@ -272,8 +267,6 @@ class AgentContext(Context):
             self.last_communication_time = current_message.create_time
             self.update_chat_current_node(current_message.id)
             
-            total_chat_time = asyncio.get_event_loop().time() - chat_start_time
-            logger.debug(f"Chat context loaded in {total_chat_time:.2f}s (DB: {db_time:.2f}s, History: {history_time:.2f}s, Convert: {convert_time:.2f}s)")
 
     async def _initialize_user_info(self):
         """Initialize user information with proper error handling"""

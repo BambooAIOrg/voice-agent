@@ -28,6 +28,7 @@ class RouteAnalysisAgent(LivekitAgent):
             "analysis_route",
             voice_mode=True
         )
+        logger.info(f"RouteAnalysisAgent initialized with instructions: {context.chat_context.items}")
         super().__init__(
             instructions=instructions,
             chat_ctx=context.chat_context

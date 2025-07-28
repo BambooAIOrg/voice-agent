@@ -1404,6 +1404,24 @@ files = [
 ]
 
 [[package]]
+name = "googleapis-common-protos"
+version = "1.70.0"
+description = "Common protobufs used in Google APIs"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "googleapis_common_protos-1.70.0-py3-none-any.whl", hash = "sha256:b8bfcca8c25a2bb253e0e0b0adaf8c00773e5e6af6fd92397576680b807e0fd8"},
+    {file = "googleapis_common_protos-1.70.0.tar.gz", hash = "sha256:0e1b44e0ea153e6594f9f394fef15193a68aaaea2d843f83e2742717ca753257"},
+]
+
+[package.dependencies]
+protobuf = ">=3.20.2,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
+
+[package.extras]
+grpc = ["grpcio (>=1.44.0,<2.0.0)"]
+
+[[package]]
 name = "goslate"
 version = "1.5.4"
 description = "Goslate: Free Google Translate API"
@@ -1667,6 +1685,30 @@ files = [
 all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
 
 [[package]]
+name = "importlib-metadata"
+version = "8.7.0"
+description = "Read metadata from Python packages"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "importlib_metadata-8.7.0-py3-none-any.whl", hash = "sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd"},
+    {file = "importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000"},
+]
+
+[package.dependencies]
+zipp = ">=3.20"
+
+[package.extras]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1) ; sys_platform != \"cygwin\""]
+cover = ["pytest-cov"]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+enabler = ["pytest-enabler (>=2.2)"]
+perf = ["ipython"]
+test = ["flufl.flake8", "importlib_resources (>=1.3) ; python_version < \"3.9\"", "jaraco.test (>=5.4)", "packaging", "pyfakefs", "pytest (>=6,!=8.1.*)", "pytest-perf (>=0.9.2)"]
+type = ["pytest-mypy"]
+
+[[package]]
 name = "jiter"
 version = "0.10.0"
 description = "Fast iterable JSON parser."
@@ -1894,18 +1936,18 @@ files = [
 
 [[package]]
 name = "livekit"
-version = "1.0.11"
+version = "1.0.12"
 description = "Python Real-time SDK for LiveKit"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit-1.0.11-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:b0acbed93eb1d152f9a03bd576f94d9750335d5e4bba32cdc07dfb8ea5c9da0c"},
-    {file = "livekit-1.0.11-py3-none-macosx_11_0_arm64.whl", hash = "sha256:615e0a1ffc57c424a57331c9051229dce2d4c6760484ae7ee968d5ba1d2163bc"},
-    {file = "livekit-1.0.11-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:c9d21de6fc8cd722da8b3db960023da5f1719edf9236c44d5e756127d1afc6b9"},
-    {file = "livekit-1.0.11-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:5c6ef90fb038f87ec5f85d1cf59f9e5e2a01dc7ea8c2ebe6a83750d291f9ce69"},
-    {file = "livekit-1.0.11-py3-none-win_amd64.whl", hash = "sha256:e118954092b3a11e601d0a246614e554bc93ef0aa5f18ee2b63957f1fb5fe38d"},
-    {file = "livekit-1.0.11.tar.gz", hash = "sha256:f3a38f6e67067b0807c79acd00e6877214aeaeb5628f84e44543103f7848ef90"},
+    {file = "livekit-1.0.12-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:aba4f1bc27065ed273a53128af2477372d3f20c5cb272f10bb221425ab932075"},
+    {file = "livekit-1.0.12-py3-none-macosx_11_0_arm64.whl", hash = "sha256:c68c94d8e40ac481ff54956a88ce6632c910b9529d11195f30785c7392446dc3"},
+    {file = "livekit-1.0.12-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:c0c937489db946c2fc29ca76f165d946b65411ed73b57e12d9a83934980f5611"},
+    {file = "livekit-1.0.12-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:34b8aeaba605044dbd5ec6599ed26a342fff20d8a61620fa7f1b03e26b485709"},
+    {file = "livekit-1.0.12-py3-none-win_amd64.whl", hash = "sha256:2d75d668ee1ebdebbef6d6a349c6bc44c18c2543f22cbba2a1bdb6f3d125da18"},
+    {file = "livekit-1.0.12.tar.gz", hash = "sha256:f81ce31d12a5f01ac3e248317d9452896fa300da677650166410a6c40c17d779"},
 ]
 
 [package.dependencies]
@@ -1916,29 +1958,37 @@ types-protobuf = ">=3"
 
 [[package]]
 name = "livekit-agents"
-version = "1.1.6"
+version = "1.2.2"
 description = "A powerful framework for building realtime voice AI agents"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "livekit_agents-1.1.6-py3-none-any.whl", hash = "sha256:b892b9bdc7e758b013fd8da0a331532268447285082b5e4cd522ded65fa57a0d"},
-    {file = "livekit_agents-1.1.6.tar.gz", hash = "sha256:6811c6a7a3f1cfc48148df729d5cacc5be6a00538c23a547b78ca67c10d8fd49"},
+    {file = "livekit_agents-1.2.2-py3-none-any.whl", hash = "sha256:46891491cd8827962cc653d83c3854329d295a143a9d20df564764fb9027c469"},
+    {file = "livekit_agents-1.2.2.tar.gz", hash = "sha256:926d31f38b92ba321501064c3a4a1a6995cdf23e925f23e347da214647516c8e"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.10,<4.0"
-av = ">=12.0.0"
+av = [
+    {version = ">=14.0.0"},
+    {version = ">=14.0.0", optional = true, markers = "extra == \"codecs\""},
+]
 click = ">=8.1,<9.0"
 colorama = ">=0.4.6"
 docstring-parser = ">=0.16"
 eval-type-backport = "*"
-livekit = ">=1.0.9,<2"
-livekit-api = ">=1.0.2,<2"
+livekit = ">=1.0.12,<2"
+livekit-api = ">=1.0.4,<2"
+livekit-blingfire = ">=1.0,<2.0"
 livekit-protocol = ">=1.0,<2.0"
 nest-asyncio = ">=1.6.0"
 numpy = ">=1.26.0"
+opentelemetry-api = ">=1.34"
+opentelemetry-exporter-otlp = ">=1.34.1"
+opentelemetry-sdk = ">=1.34.1"
 pillow = {version = ">=10.3.0", optional = true, markers = "extra == \"images\""}
+prometheus-client = ">=0.22"
 protobuf = ">=3"
 psutil = ">=7.0"
 pydantic = ">=2.0,<3"
@@ -1949,53 +1999,55 @@ typing-extensions = ">=4.12"
 watchfiles = ">=1.0"
 
 [package.extras]
-anthropic = ["livekit-plugins-anthropic (>=1.1.6)"]
-assemblyai = ["livekit-plugins-assemblyai (>=1.1.6)"]
-aws = ["livekit-plugins-aws (>=1.1.6)"]
-azure = ["livekit-plugins-azure (>=1.1.6)"]
-baseten = ["livekit-plugins-baseten (>=1.1.6)"]
-bey = ["livekit-plugins-bey (>=1.1.6)"]
-bithuman = ["livekit-plugins-bithuman (>=1.1.6)"]
-cartesia = ["livekit-plugins-cartesia (>=1.1.6)"]
-clova = ["livekit-plugins-clova (>=1.1.6)"]
+anam = ["livekit-plugins-anam (>=1.2.2)"]
+anthropic = ["livekit-plugins-anthropic (>=1.2.2)"]
+assemblyai = ["livekit-plugins-assemblyai (>=1.2.2)"]
+aws = ["livekit-plugins-aws (>=1.2.2)"]
+azure = ["livekit-plugins-azure (>=1.2.2)"]
+baseten = ["livekit-plugins-baseten (>=1.2.2)"]
+bey = ["livekit-plugins-bey (>=1.2.2)"]
+bithuman = ["livekit-plugins-bithuman (>=1.2.2)"]
+cartesia = ["livekit-plugins-cartesia (>=1.2.2)"]
+clova = ["livekit-plugins-clova (>=1.2.2)"]
 codecs = ["av (>=12.0.0)", "numpy (>=1.26.0)"]
-deepgram = ["livekit-plugins-deepgram (>=1.1.6)"]
-elevenlabs = ["livekit-plugins-elevenlabs (>=1.1.6)"]
-fal = ["livekit-plugins-fal (>=1.1.6)"]
-gladia = ["livekit-plugins-gladia (>=1.1.6)"]
-google = ["livekit-plugins-google (>=1.1.6)"]
-groq = ["livekit-plugins-groq (>=1.1.6)"]
-hedra = ["livekit-plugins-hedra (>=1.1.6)"]
-hume = ["livekit-plugins-hume (>=1.1.6)"]
+deepgram = ["livekit-plugins-deepgram (>=1.2.2)"]
+elevenlabs = ["livekit-plugins-elevenlabs (>=1.2.2)"]
+fal = ["livekit-plugins-fal (>=1.2.2)"]
+gladia = ["livekit-plugins-gladia (>=1.2.2)"]
+google = ["livekit-plugins-google (>=1.2.2)"]
+groq = ["livekit-plugins-groq (>=1.2.2)"]
+hedra = ["livekit-plugins-hedra (>=1.2.2)"]
+hume = ["livekit-plugins-hume (>=1.2.2)"]
 images = ["pillow (>=10.3.0)"]
-inworld = ["livekit-plugins-inworld (>=1.1.6)"]
-langchain = ["livekit-plugins-langchain (>=1.1.6)"]
-lmnt = ["livekit-plugins-lmnt (>=1.1.6)"]
+inworld = ["livekit-plugins-inworld (>=1.2.2)"]
+langchain = ["livekit-plugins-langchain (>=1.2.2)"]
+lmnt = ["livekit-plugins-lmnt (>=1.2.2)"]
 mcp = ["mcp (>=1.6.0,<2) ; python_version >= \"3.10\""]
-neuphonic = ["livekit-plugins-neuphonic (>=1.1.6)"]
-nltk = ["livekit-plugins-nltk (>=1.1.6)"]
-openai = ["livekit-plugins-openai (>=1.1.6)"]
-playai = ["livekit-plugins-playai (>=1.1.6)"]
-resemble = ["livekit-plugins-resemble (>=1.1.6)"]
-rime = ["livekit-plugins-rime (>=1.1.6)"]
-sarvam = ["livekit-plugins-sarvam (>=1.1.6)"]
-silero = ["livekit-plugins-silero (>=1.1.6)"]
-speechify = ["livekit-plugins-speechify (>=1.1.6)"]
-speechmatics = ["livekit-plugins-speechmatics (>=1.1.6)"]
-spitch = ["livekit-plugins-spitch (>=1.1.6)"]
-tavus = ["livekit-plugins-tavus (>=1.1.6)"]
-turn-detector = ["livekit-plugins-turn-detector (>=1.1.6)"]
+neuphonic = ["livekit-plugins-neuphonic (>=1.2.2)"]
+nltk = ["livekit-plugins-nltk (>=1.2.2)"]
+openai = ["livekit-plugins-openai (>=1.2.2)"]
+playai = ["livekit-plugins-playai (>=1.2.2)"]
+resemble = ["livekit-plugins-resemble (>=1.2.2)"]
+rime = ["livekit-plugins-rime (>=1.2.2)"]
+sarvam = ["livekit-plugins-sarvam (>=1.2.2)"]
+silero = ["livekit-plugins-silero (>=1.2.2)"]
+simli = ["livekit-plugins-simli (>=1.2.2)"]
+speechify = ["livekit-plugins-speechify (>=1.2.2)"]
+speechmatics = ["livekit-plugins-speechmatics (>=1.2.2)"]
+spitch = ["livekit-plugins-spitch (>=1.2.2)"]
+tavus = ["livekit-plugins-tavus (>=1.2.2)"]
+turn-detector = ["livekit-plugins-turn-detector (>=1.2.2)"]
 
 [[package]]
 name = "livekit-api"
-version = "1.0.3"
+version = "1.0.5"
 description = "Python Server API for LiveKit"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "livekit_api-1.0.3-py3-none-any.whl", hash = "sha256:38eee0ba44e9bba7eb95d53d29a6ac56b89e32e6f90dfa11d2f65463db8f06c5"},
-    {file = "livekit_api-1.0.3.tar.gz", hash = "sha256:24ffd1f0a92fd91f1d9977034e317951259d0ec9d053c6315c1562ba699d4cc8"},
+    {file = "livekit_api-1.0.5-py3-none-any.whl", hash = "sha256:6af149b58b182f43e9a5d2d764582ed6f083c80b520ab3d489c817cea554255e"},
+    {file = "livekit_api-1.0.5.tar.gz", hash = "sha256:1607f640ebef177208e3257098ac1fa25e37d1f72a87d0f9953d616d6eb9f18e"},
 ]
 
 [package.dependencies]
@@ -2004,6 +2056,41 @@ livekit-protocol = ">=1.0.4,<2.0.0"
 protobuf = ">=4"
 pyjwt = ">=2.0.0"
 types-protobuf = ">=4"
+
+[[package]]
+name = "livekit-blingfire"
+version = "1.0.0"
+description = "BlingFire bindings for livekit-agents"
+optional = false
+python-versions = ">=3.9.0"
+groups = ["main"]
+files = [
+    {file = "livekit_blingfire-1.0.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:afe7fd16af337980f04d46e938442a4009fd9709d281616aa53b9628b5ba9d41"},
+    {file = "livekit_blingfire-1.0.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:d34b1bc11bcddfe5c5c431c18cf6f2e79871f0952524613b988415de04ca4a00"},
+    {file = "livekit_blingfire-1.0.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b9db5aa50e1dd76bc71136cf5eee7f4a1492c3b705b03253d9aaa231ba9e1189"},
+    {file = "livekit_blingfire-1.0.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e7e1a2c31e33635cfc8db4427cfdb988402e5e19c9366bdc261189ff4500e4a8"},
+    {file = "livekit_blingfire-1.0.0-cp310-cp310-win_amd64.whl", hash = "sha256:2037e9207800aac2b952743e7be3d5084ef8b954b4e9733ecca75add8e1062ec"},
+    {file = "livekit_blingfire-1.0.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:f5ab77957efde67747c2e4edbe2252ea319286dd29c8aa00d59fc67a61ffc5d3"},
+    {file = "livekit_blingfire-1.0.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:eb96b4bd2a0e7bb62c8834e13e9e74daaadde0bfc6f02fbc3c3d4dde8b9a15c9"},
+    {file = "livekit_blingfire-1.0.0-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:433099449f325a3bae53fade09fc810686d2fbbafb38df890e6852aa4f555cc3"},
+    {file = "livekit_blingfire-1.0.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2868510d14f9753aa97251f63449ee0718769291a4708d47f9acd74a456c6bae"},
+    {file = "livekit_blingfire-1.0.0-cp311-cp311-win_amd64.whl", hash = "sha256:a1477d26bd042e849f9c09704737c70f7ab54473665c5ad7b8b24d4af6f19301"},
+    {file = "livekit_blingfire-1.0.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:fc216207ba0b88a49d25b2e8a195a29453283674e0d9cde1b0321b3ccaf90b20"},
+    {file = "livekit_blingfire-1.0.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:159c5aa73c34eb0a0242ee049d132984d5d3112b52d371b42c4364386e978cbf"},
+    {file = "livekit_blingfire-1.0.0-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:5e52d945d595b94f6eea414756725b48b767c75711ea3d9bc7f8bd4290c932ed"},
+    {file = "livekit_blingfire-1.0.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:79d1b098b134c2774dd47a9d382897b249d74ab73dfc1b87d1a61dfc285965bb"},
+    {file = "livekit_blingfire-1.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:dd41874c86ebb45eb87fb9d9a843d9c747d6b1a8ccec5806477cbc9d8e560cf2"},
+    {file = "livekit_blingfire-1.0.0-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:d9f72b7248cc55a59bb8eb96fcfe54b39dc1b6985de8385bd50440d7ef785c63"},
+    {file = "livekit_blingfire-1.0.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:948a7dcb2984ed65ad12f530e44120bb9b2631b42d53ae89be9b308eaab9119a"},
+    {file = "livekit_blingfire-1.0.0-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3c8d3a92a34925063ac05e70f6d4eebfeb9f9e29816868dece7159688b68cefe"},
+    {file = "livekit_blingfire-1.0.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:212ffef06b2e832758afcd1d19c709068207ad71f2fb5b426b6bb8e2773e9673"},
+    {file = "livekit_blingfire-1.0.0-cp313-cp313-win_amd64.whl", hash = "sha256:f3f4df6a51171a88c6863cea01c607661d6d6bc0398976a37ba0e4b3e3283433"},
+    {file = "livekit_blingfire-1.0.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:a8d348711107c719b4fb9359b6599a697aab3b1fbd7fcd83c4e4018ebbded26a"},
+    {file = "livekit_blingfire-1.0.0-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:9e8ecac29e036e1be24fcfeb6e326ebf4551987d1e0321b85e0e2d55161af4cd"},
+    {file = "livekit_blingfire-1.0.0-cp39-cp39-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3702fc05085a4fe74a26ade714e9f95b68c14f25fe00e68a8e66027b5d4afeeb"},
+    {file = "livekit_blingfire-1.0.0-cp39-cp39-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5273c5da357e33ddc51c1c8959622f9d647834197e618d1a0148f919c3ba065c"},
+    {file = "livekit_blingfire-1.0.0-cp39-cp39-win_amd64.whl", hash = "sha256:ac10f9a6e3ad8585f002ad86f5b14d684107bef1fdd95e0b4f7edbf6ecdf709e"},
+]
 
 [[package]]
 name = "livekit-plugins-cartesia"
@@ -2019,6 +2106,22 @@ files = [
 
 [package.dependencies]
 livekit-agents = ">=1.1.5"
+
+[[package]]
+name = "livekit-plugins-deepgram"
+version = "1.2.2"
+description = "Agent Framework plugin for services using Deepgram's API."
+optional = false
+python-versions = ">=3.9.0"
+groups = ["main"]
+files = [
+    {file = "livekit_plugins_deepgram-1.2.2-py3-none-any.whl", hash = "sha256:1c0f73fbce3b0a764c5d2fe331bbb2f7b2825fabede95051242d970d69355e26"},
+    {file = "livekit_plugins_deepgram-1.2.2.tar.gz", hash = "sha256:8a5bdb11ed25030cdb36a84fbba753cbfa4075c8afcbd1a2c70db76df94114a4"},
+]
+
+[package.dependencies]
+livekit-agents = {version = ">=1.2.2", extras = ["codecs"]}
+numpy = ">=1.26"
 
 [[package]]
 name = "livekit-plugins-noise-cancellation"
@@ -2599,6 +2702,146 @@ viz = ["graphviz (>=0.17)"]
 voice = ["numpy (>=2.2.0,<3) ; python_version >= \"3.10\"", "websockets (>=15.0,<16)"]
 
 [[package]]
+name = "opentelemetry-api"
+version = "1.35.0"
+description = "OpenTelemetry Python API"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_api-1.35.0-py3-none-any.whl", hash = "sha256:c4ea7e258a244858daf18474625e9cc0149b8ee354f37843415771a40c25ee06"},
+    {file = "opentelemetry_api-1.35.0.tar.gz", hash = "sha256:a111b959bcfa5b4d7dffc2fbd6a241aa72dd78dd8e79b5b1662bda896c5d2ffe"},
+]
+
+[package.dependencies]
+importlib-metadata = ">=6.0,<8.8.0"
+typing-extensions = ">=4.5.0"
+
+[[package]]
+name = "opentelemetry-exporter-otlp"
+version = "1.35.0"
+description = "OpenTelemetry Collector Exporters"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_exporter_otlp-1.35.0-py3-none-any.whl", hash = "sha256:8e6bb9025f6238db7d69bba7ee37c77e4858d0a1ff22a9e126f7c9e017e83afe"},
+    {file = "opentelemetry_exporter_otlp-1.35.0.tar.gz", hash = "sha256:f94feff09b3524df867c7876b79c96cef20068106cb5efe55340e8d08192c8a4"},
+]
+
+[package.dependencies]
+opentelemetry-exporter-otlp-proto-grpc = "1.35.0"
+opentelemetry-exporter-otlp-proto-http = "1.35.0"
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-common"
+version = "1.35.0"
+description = "OpenTelemetry Protobuf encoding"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_common-1.35.0-py3-none-any.whl", hash = "sha256:863465de697ae81279ede660f3918680b4480ef5f69dcdac04f30722ed7b74cc"},
+    {file = "opentelemetry_exporter_otlp_proto_common-1.35.0.tar.gz", hash = "sha256:6f6d8c39f629b9fa5c79ce19a2829dbd93034f8ac51243cdf40ed2196f00d7eb"},
+]
+
+[package.dependencies]
+opentelemetry-proto = "1.35.0"
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-grpc"
+version = "1.35.0"
+description = "OpenTelemetry Collector Protobuf over gRPC Exporter"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_grpc-1.35.0-py3-none-any.whl", hash = "sha256:ee31203eb3e50c7967b8fa71db366cc355099aca4e3726e489b248cdb2fd5a62"},
+    {file = "opentelemetry_exporter_otlp_proto_grpc-1.35.0.tar.gz", hash = "sha256:ac4c2c3aa5674642db0df0091ab43ec08bbd91a9be469c8d9b18923eb742b9cc"},
+]
+
+[package.dependencies]
+googleapis-common-protos = ">=1.57,<2.0"
+grpcio = [
+    {version = ">=1.63.2,<2.0.0", markers = "python_version < \"3.13\""},
+    {version = ">=1.66.2,<2.0.0", markers = "python_version >= \"3.13\""},
+]
+opentelemetry-api = ">=1.15,<2.0"
+opentelemetry-exporter-otlp-proto-common = "1.35.0"
+opentelemetry-proto = "1.35.0"
+opentelemetry-sdk = ">=1.35.0,<1.36.0"
+typing-extensions = ">=4.6.0"
+
+[[package]]
+name = "opentelemetry-exporter-otlp-proto-http"
+version = "1.35.0"
+description = "OpenTelemetry Collector Protobuf over HTTP Exporter"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_exporter_otlp_proto_http-1.35.0-py3-none-any.whl", hash = "sha256:9a001e3df3c7f160fb31056a28ed7faa2de7df68877ae909516102ae36a54e1d"},
+    {file = "opentelemetry_exporter_otlp_proto_http-1.35.0.tar.gz", hash = "sha256:cf940147f91b450ef5f66e9980d40eb187582eed399fa851f4a7a45bb880de79"},
+]
+
+[package.dependencies]
+googleapis-common-protos = ">=1.52,<2.0"
+opentelemetry-api = ">=1.15,<2.0"
+opentelemetry-exporter-otlp-proto-common = "1.35.0"
+opentelemetry-proto = "1.35.0"
+opentelemetry-sdk = ">=1.35.0,<1.36.0"
+requests = ">=2.7,<3.0"
+typing-extensions = ">=4.5.0"
+
+[[package]]
+name = "opentelemetry-proto"
+version = "1.35.0"
+description = "OpenTelemetry Python Proto"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_proto-1.35.0-py3-none-any.whl", hash = "sha256:98fffa803164499f562718384e703be8d7dfbe680192279a0429cb150a2f8809"},
+    {file = "opentelemetry_proto-1.35.0.tar.gz", hash = "sha256:532497341bd3e1c074def7c5b00172601b28bb83b48afc41a4b779f26eb4ee05"},
+]
+
+[package.dependencies]
+protobuf = ">=5.0,<7.0"
+
+[[package]]
+name = "opentelemetry-sdk"
+version = "1.35.0"
+description = "OpenTelemetry Python SDK"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_sdk-1.35.0-py3-none-any.whl", hash = "sha256:223d9e5f5678518f4842311bb73966e0b6db5d1e0b74e35074c052cd2487f800"},
+    {file = "opentelemetry_sdk-1.35.0.tar.gz", hash = "sha256:2a400b415ab68aaa6f04e8a6a9f6552908fb3090ae2ff78d6ae0c597ac581954"},
+]
+
+[package.dependencies]
+opentelemetry-api = "1.35.0"
+opentelemetry-semantic-conventions = "0.56b0"
+typing-extensions = ">=4.5.0"
+
+[[package]]
+name = "opentelemetry-semantic-conventions"
+version = "0.56b0"
+description = "OpenTelemetry Semantic Conventions"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "opentelemetry_semantic_conventions-0.56b0-py3-none-any.whl", hash = "sha256:df44492868fd6b482511cc43a942e7194be64e94945f572db24df2e279a001a2"},
+    {file = "opentelemetry_semantic_conventions-0.56b0.tar.gz", hash = "sha256:c114c2eacc8ff6d3908cb328c811eaf64e6d68623840be9224dc829c4fd6c2ea"},
+]
+
+[package.dependencies]
+opentelemetry-api = "1.35.0"
+typing-extensions = ">=4.5.0"
+
+[[package]]
 name = "oss2"
 version = "2.19.1"
 description = "Aliyun OSS (Object Storage Service) SDK"
@@ -2753,6 +2996,21 @@ test-arrow = ["pyarrow"]
 tests = ["check-manifest", "coverage (>=7.4.2)", "defusedxml", "markdown2", "olefile", "packaging", "pyroma", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "trove-classifiers (>=2024.10.12)"]
 typing = ["typing-extensions ; python_version < \"3.10\""]
 xmp = ["defusedxml"]
+
+[[package]]
+name = "prometheus-client"
+version = "0.22.1"
+description = "Python client for the Prometheus monitoring system."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "prometheus_client-0.22.1-py3-none-any.whl", hash = "sha256:cca895342e308174341b2cbf99a56bef291fbc0ef7b9e5412a0f26d653ba7094"},
+    {file = "prometheus_client-0.22.1.tar.gz", hash = "sha256:190f1331e783cf21eb60bca559354e0a4d4378facecf78f5428c39b675d20d28"},
+]
+
+[package.extras]
+twisted = ["twisted"]
 
 [[package]]
 name = "propcache"
@@ -4369,7 +4627,27 @@ idna = ">=2.0"
 multidict = ">=4.0"
 propcache = ">=0.2.1"
 
+[[package]]
+name = "zipp"
+version = "3.23.0"
+description = "Backport of pathlib-compatible object wrapper for zip files"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "zipp-3.23.0-py3-none-any.whl", hash = "sha256:071652d6115ed432f5ce1d34c336c0adfd6a884660d1e9712a256d3d3bd4b14e"},
+    {file = "zipp-3.23.0.tar.gz", hash = "sha256:a07157588a12518c9d4034df3fbbee09c814741a33ff63c05fa29d26a2404166"},
+]
+
+[package.extras]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1) ; sys_platform != \"cygwin\""]
+cover = ["pytest-cov"]
+doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
+enabler = ["pytest-enabler (>=2.2)"]
+test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_itertools", "pytest (>=6,!=8.1.*)", "pytest-ignore-flaky"]
+type = ["pytest-mypy"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "bee51ef7eb847645ce2af16e63c7c0e5681b2b053b34484c30993a2bca32b179"
+content-hash = "2cb375dbfdba405fabda508a3c7962019c8e2872ca3546c05b51c26c27b369a6"

@@ -84,7 +84,14 @@ class EventService:
                 
                 if func_output:
                     # Save function output
-                    await self.message_service.save_function_output_message(func_output)
+                    await self.message_service.save_function_output_message(
+                        func_output,
+                        meta_data={
+                            "word_id": self.context.word.id,
+                            "word": self.context.word.word,
+                            "phase": self.context.phase.value,
+                        }
+                    )
                     logger.info(f"Saved function output for: {func_output.name}")
                 
         except Exception as e:

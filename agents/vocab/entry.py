@@ -1,10 +1,11 @@
 from bamboo_shared.enums.vocabulary import VocabularyPhase
 from dotenv import load_dotenv
 from agents.vocab.context import AgentContext
+from livekit.plugins import deepgram
 from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
+
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
-
 
 from livekit.agents import (
     AgentSession,
@@ -53,7 +54,10 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
         #     detect_language=True,
         #     prompt=f"The following audio is from a Chinese student who is learning English with AI tutor. The student is currently learning the word: {context.word.word}"
         # ),
-        stt=AliSTT(),
+        stt=deepgram.STT(
+            model="nova-3",
+            # language="zh"
+        ),
         tts=MinimaxTTS(
             model="speech-02-turbo",
             voice_id="Chinese (Mandarin)_Soft_Girl",

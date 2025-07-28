@@ -102,7 +102,7 @@ class MessageService:
         self.context.update_chat_current_node(message_id)
         return message_id
 
-    async def save_function_output_message(self, function_output: FunctionCallOutput) -> str:
+    async def save_function_output_message(self, function_output: FunctionCallOutput, meta_data: dict | None = None) -> str:
         """Save a function call output message to the database and return the message ID."""
         message_id = str(uuid.uuid4())
         chat_id = self.context.chat_id
@@ -128,7 +128,7 @@ class MessageService:
                 "error": None if not function_output.is_error else "Function execution failed"
             },
             end_turn=False,
-            meta_data={}
+            meta_data=meta_data
         )
         
         await self.chat_repo.save_messages([message])
