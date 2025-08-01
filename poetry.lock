@@ -649,10 +649,8 @@ pyyaml = "^6.0.2"
 sqlalchemy = "^2.0.31"
 
 [package.source]
-type = "git"
-url = "ssh://git@github.com/BambooAIOrg/bamboo-shared.git"
-reference = "master"
-resolved_reference = "64179053dddf309453e3240700c868ecfb5d882c"
+type = "directory"
+url = "bamboo-shared"
 
 [[package]]
 name = "beautifulsoup4"
@@ -4759,4 +4757,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "f71c14e7a9c8b00da2e4c4856c7815d5a2d21684c2657d74a3af7fea1df2fc64"
+content-hash = "2cb375dbfdba405fabda508a3c7962019c8e2872ca3546c05b51c26c27b369a6"

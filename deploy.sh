@@ -58,25 +58,22 @@ sudo systemctl daemon-reload || { echo "Failed to reload systemd configuration";
 # 进入项目目录
 cd /home/admin/agents || { echo "Failed to change directory"; exit 1; }
 
-# 安装 poetry（如果还没安装）
-command -v poetry >/dev/null 2>&1 || { curl -sSL https://install.python-poetry.org | python3 - || { echo "Failed to install Poetry"; exit 1; }; }
-
 # 配置 poetry 在项目目录下创建虚拟环境
 export PATH="$HOME/.local/bin:$PATH"
+echo "Current Poetry version: $(poetry --version)"
 poetry config virtualenvs.in-project true || { echo "Failed to configure Poetry"; exit 1; }
 
-# 删除旧的虚拟环境（如果存在）
+# 清理 Poetry 缓存和虚拟环境
+echo "Cleaning Poetry cache and virtual environment..."
+poetry cache clear --all . -n 2>/dev/null || true
 rm -rf .venv || { echo "Failed to remove old virtual environment"; exit 1; }
+rm -rf ~/.cache/poetry || true
 
-# 锁定依赖
-echo "Locking dependencies..."
-poetry lock >/dev/null 2>&1 || { echo "Failed to lock dependencies"; exit 1; }
-
+sudo chown -R admin:admin /home/admin/agents
 # 使用 poetry 安装依赖
 echo "Installing dependencies (this may take a while)..."
-poetry install --only=main --quiet || { echo "Failed to install dependencies"; exit 1; }
+sudo poetry install --only=main || { echo "Failed to install dependencies"; exit 1; }
 
-# 尝试导入应用主模块
 poetry run python -c "import main" || { echo "Failed to import main module"; exit 1; }
 
 # 确保 python 可执行路径正确
