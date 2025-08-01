@@ -13,12 +13,16 @@ from bamboo_shared.enums.vocabulary import (
 from typing import Annotated
 from bamboo_shared.models import UserWrittenSentence
 from bamboo_shared.repositories.user_written_sentence import UserWrittenSentenceRepository
+from livekit import rtc
+
+import json
 
 logger = get_logger(__name__)
 
 class MainScheduleAgent(LivekitAgent):
-    def __init__(self, context: AgentContext) -> None:
+    def __init__(self, context: AgentContext, room: rtc.Room) -> None:
         self.context = context
+        self.room = room
         instructions = self._get_current_instructions()
         
         super().__init__(
@@ -64,9 +68,9 @@ class MainScheduleAgent(LivekitAgent):
         """Handoff to the Main Schedule Agent agent to handle the request."""
         current_phase = self.context.phase
         
-        # 定义阶段转换逻辑
+        context.userdata.chat_context = context.session._chat_ctx
+
         if current_phase == VocabularyPhase.WORD_CREATION_LOGIC:
-            # 检查是否有相似词，决定下一阶段
             similar_words = self.context.word.similar_words
             if similar_words and len(similar_words) > 0:
                 self.context.phase = VocabularyPhase.SYNONYM_DIFFERENTIATION
@@ -83,13 +87,11 @@ class MainScheduleAgent(LivekitAgent):
             # 完成当前单词，转到下一个单词
             from agents.vocab.agents.route_analysis import RouteAnalysisAgent
             logger.info("Current word completed, transferring to RouteAnalysisAgent for next word")
-            context.userdata.chat_context = context.session._chat_ctx
-            agent = RouteAnalysisAgent(context=context.userdata)
+            agent = RouteAnalysisAgent(context=context.userdata, room=self.room)
             return agent, None
         
         await self.update_instructions(self._get_current_instructions())
-        
-        return MainScheduleAgent(context=context.userdata), None
+        return MainScheduleAgent(context=context.userdata, room=self.room), None
 
     @function_tool
     async def transfer_to_next_word_agent(
@@ -100,7 +102,19 @@ class MainScheduleAgent(LivekitAgent):
         from agents.vocab.agents.route_analysis import RouteAnalysisAgent
         logger.info("Current word completed, transferring to RouteAnalysisAgent for next word")
         context.userdata.chat_context = context.session._chat_ctx
-        agent = RouteAnalysisAgent(context=context.userdata)
+        next_word = await context.userdata.go_next_word()
+
+        if not next_word:
+            logger.info("No next word available, returning None")
+            return "No next word available"
+        
+        agent = RouteAnalysisAgent(context=context.userdata, room=self.room)
+        
+        await self.room.local_participant.publish_data(
+            payload=json.dumps({"transferd_word_id": next_word.id}).encode("utf-8"),
+            reliable=True,
+            topic="vocabulary/word_transfer"
+        )
         return agent, None
 
 

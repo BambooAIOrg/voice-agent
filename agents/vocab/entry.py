@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from agents.vocab.context import AgentContext
 from livekit.plugins import deepgram
 from plugins.tokenizer.mixedLanguageTokenizer import install_mixed_language_tokenize
+from livekit import rtc
 
 load_dotenv(dotenv_path=".env.local")
 install_mixed_language_tokenize()
@@ -49,15 +50,15 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
     session = AgentSession[AgentContext](
         vad=ctx.proc.userdata["vad"],
         llm=openai.LLM(model="gpt-4.1"),
-        # stt=openai.STT(
-        #     model="gpt-4o-transcribe",
-        #     detect_language=True,
-        #     prompt=f"The following audio is from a Chinese student who is learning English with AI tutor. The student is currently learning the word: {context.word.word}"
-        # ),
-        stt=deepgram.STT(
-            model="nova-3",
-            # language="zh"
+        stt=openai.STT(
+            model="gpt-4o-transcribe",
+            detect_language=True,
+            prompt=f"The following audio is from a Chinese student who is learning English with AI tutor. The student is currently learning the word: {context.word.word}"
         ),
+        # stt=deepgram.STT(
+        #     model="nova-3",
+        #     # language="zh"
+        # ),
         tts=MinimaxTTS(
             model="speech-02-turbo",
             voice_id="Chinese (Mandarin)_Soft_Girl",
@@ -91,7 +92,7 @@ async def vocab_entrypoint(ctx: JobContext, metadata: dict):
 
     logger.info(f"Starting session for user {user_id} and word {word_id}")
     await session.start(
-        agent=GreetingAgent(context=context),
+        agent=GreetingAgent(context=context, room=ctx.room),
         room=ctx.room,
         room_input_options=RoomInputOptions(
             noise_cancellation=noise_cancellation.BVC(),

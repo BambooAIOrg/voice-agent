@@ -235,19 +235,15 @@ class TTS(tts.TTS):
         else:
             ws_timeout = getattr(self, "_conn_options", type("_", (), {"timeout": 30.0})()).timeout  # type: ignore[attr-defined]
 
-        logger.debug(f"Connecting to WebSocket with timeout={ws_timeout}")
-
         try:
             ws = await asyncio.wait_for(
                 session.ws_connect(url, headers=headers, heartbeat=10.0),
                 timeout=ws_timeout,
             ) 
-            logger.info("WebSocket connection established successfully, heartbeat=10.0s")
         except (asyncio.TimeoutError, aiohttp.ClientConnectionError, OSError) as e:
             logger.error(f"Failed to connect to WebSocket: {type(e).__name__}")
             raise APIConnectionError(f"Failed to connect to WebSocket: {type(e).__name__}")
 
-        logger.debug("WebSocket connection established – sending task_start")
         try:
             await self._start_task(ws)
         except Exception as e:
@@ -274,7 +270,6 @@ class TTS(tts.TTS):
                 "channel": self._opts.channels
             }
         }
-        logger.debug(f"Sending task_start message: {start_msg}")
         try:
             await ws.send_json(start_msg)
         except (aiohttp.ClientConnectionError, ConnectionResetError) as e:
@@ -419,12 +414,10 @@ class SynthesizeStream(tts.SynthesizeStream):
         # Start first segment so the emitter collects frames immediately.
         output_emitter.start_segment(segment_id="0")
 
-        # Obtain WebSocket connection from pool (respect timeout settings)
-        logger.debug(f"[{self._request_id}] Requesting WebSocket connection from pool")
-        async with self._pool.connection(timeout=self._conn_options.timeout) as ws:  # type: ignore[attr-defined]
-            logger.info(f"[{self._request_id}] Got WebSocket connection from pool, closed={ws.closed}")
-            
-            # Check if connection is already closed and raise error if so
+        start_time = time.time()
+        async with self._pool.connection(timeout=self._conn_options.timeout) as ws:
+            logger.info(f"retrieve connection: take time: {time.time() - start_time:.2f}s")
+
             if ws.closed:
                 logger.error(f"[{self._request_id}] WebSocket connection from pool is already closed")
                 raise APIConnectionError("WebSocket connection from pool is already closed")
@@ -484,7 +477,6 @@ class SynthesizeStream(tts.SynthesizeStream):
     async def _send_task(self, ws: aiohttp.ClientWebSocketResponse) -> None:
         """Reads tokens from the tokenizer and sends them to the WebSocket."""
         try:
-            has_sent_any_token = False
             has_any_token_to_send = False
             async for ev in self._sent_tokenizer_stream:
                 token = ev.token
@@ -502,7 +494,6 @@ class SynthesizeStream(tts.SynthesizeStream):
                 # 增加待处理任务计数
                 async with self._pending_tasks_lock:
                     self._pending_tasks_count += 1
-                    logger.debug(f"[{self._request_id}] Incremented pending tasks count to {self._pending_tasks_count}")
                 
                 # Check if WebSocket is still open before sending
                 if ws.closed:
@@ -511,7 +502,6 @@ class SynthesizeStream(tts.SynthesizeStream):
                 
                 try:
                     await ws.send_json(send_payload)
-                    has_sent_any_token = True
                 except (aiohttp.ClientConnectionError, ConnectionResetError) as e:
                     logger.error(f"[{self._request_id}] WebSocket send failed: {e}")
                     raise APIConnectionError(f"WebSocket send failed: {e}")
@@ -541,7 +531,6 @@ class SynthesizeStream(tts.SynthesizeStream):
                 # 先检查是否应该退出
                 async with self._pending_tasks_lock:
                     if self._tokenizer_finished and self._pending_tasks_count <= 0:
-                        logger.debug(f"[{self._request_id}] Tokenizer finished and all tasks completed. Breaking recv_task loop.")
                         break
 
                 # 等待 WebSocket 消息或 _no_tokens_sent_event 被设置
@@ -550,7 +539,6 @@ class SynthesizeStream(tts.SynthesizeStream):
                 
                 tasks_to_wait = [receive_ws_task, wait_no_tokens_event_task]
                 
-                # 如果tokenizer已完成但还有待处理任务，添加适当的超时
                 timeout_task = None
                 async with self._pending_tasks_lock:
                     if self._tokenizer_finished and self._pending_tasks_count > 0:
@@ -630,18 +618,14 @@ class SynthesizeStream(tts.SynthesizeStream):
                              self._emit_error(APIError(f"Failed to process audio", body=frame_e), recoverable=False)
 
                     if is_final:
-                        logger.debug(f"[{self._request_id}] Received is_final=True. Flushing audio stream and emitter.")
                         # Indicate end-of-segment so emitter can emit final frame
                         emitter.flush()
                         
                         # decrease the pending tasks count
                         async with self._pending_tasks_lock:
                             self._pending_tasks_count -= 1
-                            logger.debug(f"[{self._request_id}] Decremented pending tasks count to {self._pending_tasks_count}")
-                            
                             # break the loop if tokenizer is finished and all tasks are completed
                             if self._tokenizer_finished and self._pending_tasks_count <= 0:
-                                logger.debug(f"[{self._request_id}] Tokenizer finished and all tasks completed. Breaking recv_task loop.")
                                 break
         except asyncio.TimeoutError:
             # Standard timeout occurred - server didn't respond or close connection in time
@@ -655,9 +639,7 @@ class SynthesizeStream(tts.SynthesizeStream):
             # Propagate error
             raise
         finally:
-            # Ensure emitter is flushed when the task ends
             try:
-                logger.debug(f"[{self._request_id}] Flushing emitter in _recv_task finally block.")
                 emitter.flush()
             except Exception as flush_e:
                  logger.exception(f"[{self._request_id}] Error flushing emitter in finally block:")

@@ -10,12 +10,14 @@ from bamboo_shared.logger import get_logger
 from livekit.agents import Agent as LivekitAgent
 from livekit.agents.llm.chat_context import ChatMessage as LivekitChatMessage
 from bamboo_shared.agent.instructions import prompt_with_voice_mindset_instructions
+from livekit import rtc
 
 logger = get_logger(__name__)
 
 class GreetingAgent(LivekitAgent):
-    def __init__(self, context: AgentContext) -> None:
+    def __init__(self, context: AgentContext, room: rtc.Room) -> None:
         self.context = context
+        self.room = room
         nickname = context.user_info.nick_name
 
         # 获取北京时间
@@ -93,9 +95,9 @@ class GreetingAgent(LivekitAgent):
             logger.info(f"chat_context: {self._chat_ctx.to_dict()}")
             logger.info(f"chat_context: {agent_context.chat_context.to_dict()}")
             if context.userdata.phase == VocabularyPhase.ANALYSIS_ROUTE:
-                agent = RouteAnalysisAgent(context=agent_context)
+                agent = RouteAnalysisAgent(context=agent_context, room=context.room)
             else:
-                agent = MainScheduleAgent(context=agent_context)
+                agent = MainScheduleAgent(context=agent_context, room=context.room)
 
             return agent, None
         except Exception as e:

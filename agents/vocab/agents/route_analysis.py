@@ -9,13 +9,15 @@ from livekit.agents import Agent as LivekitAgent
 from bamboo_shared.models import UserWrittenSentence
 from bamboo_shared.repositories.user_written_sentence import UserWrittenSentenceRepository
 from bamboo_shared.enums.vocabulary import SentenceType
+from livekit import rtc
 
 logger = get_logger(__name__)
 
 
 class RouteAnalysisAgent(LivekitAgent):
-    def __init__(self, context: AgentContext) -> None:
+    def __init__(self, context: AgentContext, room: rtc.Room) -> None:
         self.context = context
+        self.room = room
         self.template_variables = TemplateVariables(
             word=context.word.word,
             nickname=context.user_info.nick_name,
@@ -65,11 +67,10 @@ class RouteAnalysisAgent(LivekitAgent):
         self,
         context: RunContext[AgentContext],
     ):
-        """Call this function when the student confirms they are ready to start learning about etymology."""
-        logger.info("Handing off to EtymologyAgent.")
+        """Handoff to the Next Word Agent agent to handle the request."""
         context.userdata.chat_context = context.session._chat_ctx
         await context.userdata.go_next_word()
-        agent = RouteAnalysisAgent(context=context.userdata)
+        agent = RouteAnalysisAgent(context=context.userdata, room=self.room)
         return agent, None
 
     @function_tool

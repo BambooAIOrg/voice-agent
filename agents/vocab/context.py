@@ -146,6 +146,7 @@ class Context:
             parent_chat_id = self.chat_reference.chat_id
             prev_chat = await chat_repo.get_chat(parent_chat_id)
 
+            logger.info(f"Transitioning to next word: {next_word.word}, prev_chat: {prev_chat.to_dict() if prev_chat else None}, parent_chat_id: {parent_chat_id}")
             self.chat_id = chat_id
             
             if not prev_chat or not prev_chat.current_node:
